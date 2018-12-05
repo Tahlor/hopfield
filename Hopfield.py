@@ -1,79 +1,186 @@
 import numpy as np
+import matplotlib
 
 """ Todo: 
-        * manage weights
-        * parallel processing
-        * GPU?
-        * optimal weight matrix
+        
+# Ideas/parameters:
+    # Learning rate
+    # Think about simulated annealing?
+    # Stochastic updates vs batch
+        # Fully random updates
+        # Update each node 1x per cycle in random order
+        # Batch - update all nodes simultaneously (GPU??)
+    # Parallel processing
+        # Use mutliple cores
+    # Add noise periodically to push out of bad solutions
+    # -inf
+        # Increase learning -inf through time
+        # Set -inf near largest cost in matrix
+    # Cost matrix
+    # Graphical output:
+        # Make a circle corresponding to the magnitude of each guess
+
 """
 
-# Is there a way we can re-frame the problem to get it work in PyTorch?
-# Maybe our node matrix are our tunable weights
-# Use gradient ascent
-# We're interested in the weights, not the output
-# Our "weights" are the input
-# The output is the temperature
+"""
+Other:
+    # Is there a way we can re-frame the problem to get it work in PyTorch?
+    # Maybe our node matrix are our tunable weights
+    # Use gradient ascent
+    # We're interested in the weights, not the output
+    # Our "weights" are the input
+    # The output is the temperature
+"""
+
+VERBOSE = False
 
 class HopfieldNetwork:
 
-    def __init__(self, cost_matrix, values=None, inf=-1):
+    def __init__(self, cost_matrix, initial_guess=None, inf=-.8):
+        """
+        Args:
+              cost_matrix (2D npy array): Square matrix, expects np.inf for invalid paths
+              initial_guess (2D npy array): Initial guess for solutioon
+              inf (int): Weight for invalid solution paths; more negative = more invalid
+        """
+
         self.inf = inf
         self.n = cost_matrix.shape[0]
-        self.values = np.zeros(*cost_matrix.shape) if values is None else values
+        self.initialize_guess(initial_guess)
+
+        if VERBOSE:
+            print("Guess:")
+            print(self.sol_guess)
+
+        self.original_cost_matrix = cost_matrix.copy()
         self.cost_matrix = self.scale_cost_matrix(cost_matrix)
         self.negative_weights = np.ones(self.n-1)*inf
         self.learning_rate = .1
 
+    def initialize_guess(self, guess=None):
+        # Start city doesn't matter, we could always start in 0
+        if guess is None:
+            self.sol_guess = np.random.random([self.n, self.n])
+        else:
+            self.sol_guess = None
+
     def scale_cost_matrix(self, cost_matrix):
+        """ Rescale cost matrix, so higher cost routes have smaller weights
+            Impossible routes have even smaller weights (e.g. negative)
+        """
+
         _min = np.min(cost_matrix)
         _max = np.max(cost_matrix)
-        np.fill_diagonal(cost_matrix, 0)
+
+        # Find which routes are impossible, fill with 0 temporarily
+        inf_idx = cost_matrix==np.inf
+        cost_matrix[inf_idx] = 0
+
         cost_matrix = 1-(cost_matrix - _min)/(_max-_min) # rescale to 0 to 1, then reverse
-        np.fill_diagonal(cost_matrix, self.inf)
+
+        # After rescaling, make routes impossible again
+        cost_matrix[inf_idx] = self.inf
         return cost_matrix
 
-    def update_node(self,i,j):
+    def fully_stochastic_update(self, iterations=100):
+        for _ in range(0, iterations):
+            i = np.random.randint(0, self.n)
+            j = np.random.randint(0, self.n)
+            h.update_node(i, j)
+
+        self.report_solution(self.sol_guess)
+
+    def report_solution(self, solution):
+        sol = np.round(solution)
+        happiness = self.get_happiness(sol)
+        path = np.argmax(sol, axis=1)
+        cost = self.get_cost(path)
+        print("Solution: {}".format(path))
+        print("Cost: {}".format(cost))
+        print("Valid: {}".format(cost < np.inf))
+        print("Happiness: {}".format( happiness))
+
+    def update_node(self,i,j,learning_rate=None):
+        """ Update a single node
+        """
+        if learning_rate is None:
+            learning_rate = self.learning_rate
+
         # i is an index of cities
         # j is an index of city-visit ordering
-        next_city_idx = (j+1) % self.n
+        next_city_idx = (j+1) % self.n # wrap around to beginning
         indices = np.arange(self.n)
 
-        #print(self.values[:,next_city_idx],self.cost_matrix[i,:],self.values[indices!=i,j],self.negative_weights,self.values[i,indices!=j],self.negative_weights)
-
         # Cost matrix
-        update = np.sum(self.values[:,next_city_idx] * self.cost_matrix[i,:])
+        update = np.sum(self.sol_guess[:, next_city_idx] * self.cost_matrix[i, :])
 
         # No duplicate visit on column
-        update += np.sum(self.values[indices!=i,j]*self.negative_weights)
+        update += np.sum(self.sol_guess[indices != i, j] * self.negative_weights)
 
         # No duplicate visit on row
-        update += np.sum(self.values[i,indices!=j]*self.negative_weights)
+        update += np.sum(self.sol_guess[i, indices != j] * self.negative_weights)
 
-        delta = self.learning_rate * (1 if update > 0 else -1)
+        delta = learning_rate * (1 if update > 0 else -1)
 
-        self.values[i,j] = max(min(self.values[i,j]+delta,1),0)
+        self.sol_guess[i, j] = max(min(self.sol_guess[i, j] + delta, 1), 0)
         return update
 
-    def energy(self):
-        return np.sum(self.cost_matrix * self.values)
+    def get_happiness(self, sol=None, improve_tour_factor=10):
+        """ Calculate 'happiness' of network. This is -energy (maximize happiness, minimize energy/entropy)
+            Depends on network topology (how we choose to connect nodes)
 
-inf = -1
-test = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
-values = np.asarray([[1,1,1,1],[1,1,1,1],[1,1,1,1],[1,1,1,1]])
-values = np.asarray([[1.5,0,0,0],[0,0,0,1],[0,1,0,0],[0,0,1,0]])
-# Solution: 0 2 3 1
+            Args:
+                sol (2d matrix): Our guessed solution
+                improve_tour_factor (int): Increasing this should make 1) shorter tours, but 2) increase the liklihood they are invalid
+        """
 
-n=test.shape[0]
+        if sol is None:
+            sol = self.sol_guess
+        indices = np.arange(self.n)
+        happiness = 0
+        for i in range(0,self.n):
+            for j in range(0,self.n):
+                next_city_idx = (j + 1) % self.n
 
-#values = np.random.random(n,n)
-#costs = np.asarray([[0,0,1],[0,0,-1],[1,-1,0]])
-#values = np.asarray([[1,1,1],[1,1,1],[1,1,1]])
+                # Costs - this line doesn't seem to be working right
+                happiness += np.sum(sol[:,next_city_idx] * self.cost_matrix[i,:]) * improve_tour_factor
 
-h = HopfieldNetwork(test, values)
-for _ in range(0,100):
-    i = np.random.randint(0,n)
-    j = np.random.randint(0,n)
-    print(i,j)
-    h.update_node(i,j)
-print(h.values)
+                # No duplicate visit on column
+                happiness += np.sum(sol[indices!=i,j]*self.negative_weights)
+
+                # No duplicate visit on row
+                happiness += np.sum(sol[i,indices!=j]*self.negative_weights)
+
+        return happiness
+
+    def get_cost(self, sol):
+        """
+        Args:
+            sol (array): A list of city indices
+        """
+        cost = 0
+        for i, city_idx in enumerate(sol):
+            src = sol[i]
+            dest = sol[(i+1) % self.n]
+            cost+=self.original_cost_matrix[src,dest]
+        return cost
+
+    def plot_current_state(self):
+        """ Plot the self.sol_guess matrix, a circle for each matrix cell, radius proportional to magnitude
+        """
+
+
+
+        pass
+
+
+if __name__=="__main__":
+    inf = np.inf
+    cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
+    #values = np.asarray([[1,1,1,1],[1,1,1,1],[1,1,1,1],[1,1,1,1]])
+    actual_solution = np.asarray([[1.,0,0,0],[0,0,0,1],[0,1,0,0],[0,0,1,0]])
+    # Solution: 0 2 3 1
+
+    h = HopfieldNetwork(cost_matrix, None)
+    h.fully_stochastic_update(1000)
 
