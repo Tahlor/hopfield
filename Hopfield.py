@@ -1,12 +1,18 @@
 import numpy as np
 import matplotlib
 import time
+import pandas as pd
+import collections
+import logging
+import utils
 
 """ Todo: 
 
 # Ideas/parameters:
     ### Work on reporting lots of test results at once
-    
+
+    # Make parameters learnable
+        
     # Learning rate
     # Think about simulated annealing?
     # Stochastic updates vs batch
@@ -36,12 +42,18 @@ Other:
     # The output is the temperature
 """
 
-VERBOSE = False
+# GLOBALS
+inf = np.inf
 
+## Logging
+logger = logging.getLogger(__name__)
+logger.setLevel("WARNING")
+#logger.setLevel("INFO")
+logging.getLogger().addHandler(logging.StreamHandler())
 
 class HopfieldNetwork:
 
-    def __init__(self, cost_matrix, initial_guess=None, inf=-.8, learning_rate=.1, improve_tour_factor=1, clamp_first_column=True):
+    def __init__(self, cost_matrix, initial_guess=None, inf=-.8, epochs=100, learning_rate=.1, improve_tour_factor=1.0, force_visit_bias=0.0, clamp_first_column=True, optimal_cost=None):
         """
         Args:
               cost_matrix (2D npy array): Square matrix, expects np.inf for invalid paths
@@ -49,6 +61,9 @@ class HopfieldNetwork:
               inf (int): Weight for invalid solution paths; more negative = more invalid
               improve_tour_factor (int): Increasing this should make 1) shorter tours, but 2) increase the liklihood they are invalid
                                             CANNOT be 0, system will yield all 0's since no incentive to travel
+              force_visit_bias (int): Positive increases the liklihood a city is visited;
+                                    If not enough cities are visited, this promotes ANY visit (not skewed toward optimal ones)
+              optimal_cost (list): A list of city indices
         """
 
         self.inf = inf
@@ -56,19 +71,20 @@ class HopfieldNetwork:
         self.improve_tour_factor = improve_tour_factor
         self.clamp_first_column = clamp_first_column
         self.negative_weights = np.ones(self.n - 1) * inf
-
-        if VERBOSE:
-            print("Guess:")
-            print(self.sol_guess)
+        self.force_visit_bias = force_visit_bias
+        self.optimal_cost = optimal_cost
 
         self.original_cost_matrix = cost_matrix.copy()
         self.cost_matrix = self.scale_cost_matrix(cost_matrix)
 
+        # Make first guess
         self.initialize_guess(initial_guess)
+        logger.debug("Guess: \n {}".format(self.sol_guess))
 
         self.learning_rate = learning_rate
+        self.epochs = epochs
 
-# add a penalty for update
+# add a penalty for update??
 
     def initialize_guess(self, guess=None):
         # Start city doesn't matter, we could always start in 0
@@ -81,7 +97,7 @@ class HopfieldNetwork:
                 self.sol_guess[0,0] = 1
         else:
             self.sol_guess = guess
-        self.report_solution(self.sol_guess)
+        #self.report_solution(self.sol_guess)
 
     def scale_cost_matrix(self, cost_matrix):
         """ Rescale cost matrix, so higher cost routes have smaller weights
@@ -99,15 +115,34 @@ class HopfieldNetwork:
         cost_matrix[inf_idx] = self.inf
         return cost_matrix
 
-    def fully_stochastic_update(self, iterations=100):
+    def fully_stochastic_update(self, iterations=None):
+        if iterations is None:
+            iterations = self.epochs * self.n ** 2
         lower_bound = 1 if self.clamp_first_column else 0
 
         for _ in range(0, iterations):
             i = np.random.randint(0, self.n)
             j = np.random.randint(lower_bound, self.n)
-            h.update_node(i, j)
+            self.update_node(i, j)
 
-        self.report_solution(self.sol_guess)
+        return self.report_solution(self.sol_guess)
+
+    def balanced_stochastic_update(self, iterations=None):
+        if not iterations is None:
+            epochs = np.ceil(iterations / self.n ** 2)
+        else:
+            epochs = self.epochs
+        lower_bound = 1 if self.clamp_first_column else 0
+        i_s = range(0, self.n)
+        j_s = range(lower_bound, self.n)
+        all_pairs = utils.cartesian_product(i_s, j_s)
+        for e in range(0,epochs):
+            np.random.shuffle(all_pairs)
+            for pair in all_pairs:
+                self.update_node(pair[0],pair[1])
+
+        return self.report_solution(self.sol_guess)
+
 
     def get_path(self, sol):
         # Take argmax
@@ -115,7 +150,8 @@ class HopfieldNetwork:
 
         # If argmax is actually 0, return -1
         column_sum = np.sum(sol, axis=0)
-        path[column_sum!=1]=-1
+        path[column_sum>1]=-2 # means we visited too many cities
+        path[column_sum<1]=-1 # means we visited 0 cities
         return path
 
     def report_solution(self, solution):
@@ -123,11 +159,23 @@ class HopfieldNetwork:
         happiness = self.get_happiness(sol)
         path = self.get_path(sol)
         cost = self.get_cost(sol)
-        print(solution)
-        print("Solution: {}".format(path))
-        print("Cost: {}".format(cost))
-        print("Valid: {}".format(cost < np.inf))
-        print("Happiness: {}".format(happiness))
+        logger.debug(solution)
+        logger.debug("Solution: {}".format(path))
+        logger.debug("Cost: {}".format(cost))
+        logger.debug("Valid: {}".format(cost < np.inf))
+        logger.debug("Happiness: {}".format(happiness))
+
+        counts = collections.Counter(path)
+        result = {'Cost': cost,
+             'Valid': cost < np.inf,
+             'Optimal': cost==self.optimal_cost,
+             'Path':path,
+             'Too few cities': counts[-1],
+             'Too many cities': counts[-2]
+                  }
+
+        logger.info(result)
+        return result
 
     def update_node(self, i, j, learning_rate=None, improve_tour_factor=None):
         """ Update a single node
@@ -144,14 +192,7 @@ class HopfieldNetwork:
         indices = np.arange(self.n)
 
         # Cost matrix - this rewards the system for taking a non-zero path
-        update = np.sum(self.sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor # * self.sol_guess[i, j]
-        #update = 0
-        # print(i,j)
-        # print(self.sol_guess)
-        # print("solution", self.sol_guess[:, next_city_idx])
-        # print(self.cost_matrix)
-        # print("cost", self.cost_matrix[i,:])
-        # print("update", update)
+        update = np.sum(self.sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor + self.force_visit_bias
 
         # No duplicate visit on column
         update += np.sum(self.sol_guess[indices != i, j] * self.negative_weights)
@@ -224,9 +265,19 @@ class HopfieldNetwork:
 
         pass
 
+    def run_simulations(self, simulations=100):
+        results = [self.balanced_stochastic_update()]
+        for i in range(0,simulations-1):
+            self.initialize_guess()
+            results.append(self.balanced_stochastic_update())
 
-if __name__ == "__main__":
-    inf = np.inf
+        df = pd.DataFrame(results)
+        #print(df)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        print(df[["Cost"]].dropna(axis=0).mean())
+        print(df.drop(["Cost"], axis=1).mean())
+
+def toy_problem():
     cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
     n = cost_matrix.shape[0]
     # values = np.asarray([[1,1,1,1],[1,1,1,1],[1,1,1,1],[1,1,1,1]])
@@ -236,12 +287,17 @@ if __name__ == "__main__":
     noise[:,0] = 0
     solution_noise = solution+noise
 
-
-    guess = solution_noise
+    guess = None
     # Solution: 0 2 3 1
     # guess = None
 
-    h = HopfieldNetwork(cost_matrix, initial_guess=guess, improve_tour_factor=.5, learning_rate=.01)
+    h = HopfieldNetwork(cost_matrix, initial_guess=guess, improve_tour_factor=.5, learning_rate=.01, force_visit_bias=.5)
     h.fully_stochastic_update(2000)
 
+if __name__ == "__main__":
+    #toy_problem()
 
+    cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
+    h = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=.2,
+                      force_visit_bias=0, epochs=80, optimal_cost=15)
+    h.run_simulations()
