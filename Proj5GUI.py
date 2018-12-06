@@ -18,7 +18,6 @@ elif PYQT_VER == 'PYQT4':
 else:
     raise Exception('Unsupported Version of PyQt: {}'.format(PYQT_VER))
 
-
 #TODO: Error checking on txt boxes
 #TODO: Color strings
 

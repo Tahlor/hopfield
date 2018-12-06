@@ -55,7 +55,7 @@ logging.getLogger().addHandler(logging.StreamHandler())
 class HopfieldNetwork:
 
     def __init__(self, cost_matrix, initial_guess=None, inf=-.8, epochs=100, learning_rate=.1, improve_tour_factor=1.0,
-                 force_visit_bias=0.0, clamp_first_column=True, optimal_cost=None, when_to_force_valid=.75, force_valid_factor=1):
+                 force_visit_bias=0.0, clamp_first_column=True, optimal_cost=inf, when_to_force_valid=.75, force_valid_factor=1):
         """
         Args:
               cost_matrix (2D npy array): Square matrix, expects np.inf for invalid paths
@@ -185,18 +185,18 @@ class HopfieldNetwork:
         path = self.get_path(sol)
         cost = self.get_cost(sol)
         logger.debug(solution)
-        logger.debug("Solution: {}".format(path))
-        logger.debug("Cost: {}".format(cost))
-        logger.debug("Valid: {}".format(cost < np.inf))
-        logger.debug("Happiness: {}".format(happiness))
+        logger.debug("solution: {}".format(path))
+        logger.debug("cost: {}".format(cost))
+        logger.debug("valid: {}".format(cost < np.inf))
+        logger.debug("happiness: {}".format(happiness))
 
         counts = collections.Counter(path)
-        result = {'Cost': cost,
-             'Valid': cost < np.inf,
-             'Optimal': cost==self.optimal_cost,
-             'Path':path,
-             'Too few cities': counts[-1],
-             'Too many cities': counts[-2]
+        result = {'cost': cost,
+             'valid': cost < np.inf,
+             'optimal': cost==self.optimal_cost,
+             'path':path,
+             'too few cities': counts[-1],
+             'too many cities': counts[-2]
                   }
 
         logger.info(result)
@@ -299,8 +299,46 @@ class HopfieldNetwork:
         df = pd.DataFrame(results)
         #print(df)
         df = df.replace([np.inf, -np.inf], np.nan)
-        print(df[["Cost"]].dropna(axis=0).mean())
-        print(df.drop(["Cost"], axis=1).mean())
+        print(df[["cost"]].dropna(axis=0).mean())
+        print(df.drop(["cost"], axis=1).mean())
+
+    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update"):
+        total_attempts = 0
+        start = time.time()
+        results = []
+        found_optimal = False
+
+        while time.time() - start < max_time:
+            total_attempts+=1
+            self.initialize_guess()
+            result = eval("self.{}()".format(update_method))
+            results.append(result)
+
+            if result["cost"] <= self.optimal_cost and self.optimal_cost<inf:
+                found_optimal=True
+                if result["cost"] < self.optimal_cost:
+                    logger.warn("Provided optimal value was not optimal.")
+                break
+
+        end = time.time()
+
+        if found_optimal:
+            best_result = result
+        else:
+            # get minimum cost result
+            best_result = results[np.argmin([r['cost'] for r in results])]
+
+        best_result["time"] = end-start
+        best_result["attempts"] = total_attempts
+
+        # Create summary
+        df = pd.DataFrame(results)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        avg_cost = df[["cost"]].dropna(axis=0).mean()
+        avg_everything = df.drop(["cost"], axis=1).mean()
+        avg_everything = avg_everything.append(avg_cost)
+        print(avg_everything)
+        return best_result, avg_everything
 
 def toy_problem():
     cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
@@ -325,4 +363,5 @@ if __name__ == "__main__":
     cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
     h = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=.2,
                       force_visit_bias=0, epochs=80, optimal_cost=15, when_to_force_valid=.75, force_valid_factor=10)
-    h.run_simulations()
+    #h.run_simulations()
+    h.run_until_optimal(optimal_cost=15)
