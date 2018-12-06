@@ -124,7 +124,6 @@ class HopfieldNetwork:
             i = np.random.randint(0, self.n)
             j = np.random.randint(lower_bound, self.n)
             self.update_node(i, j)
-
         return self.report_solution(self.sol_guess)
 
     def balanced_stochastic_update(self, iterations=None):
@@ -143,9 +142,9 @@ class HopfieldNetwork:
 
         return self.report_solution(self.sol_guess)
 
-
-    def get_path(self, sol):
+    def get_path(self, sol=None):
         # Take argmax
+        if sol is None: sol = self.sol_guess
         path = np.argmax(sol, axis=0)
 
         # If argmax is actually 0, return -1
@@ -240,12 +239,12 @@ class HopfieldNetwork:
 
         return happiness
 
-    def get_cost(self, solution_matrix):
+    def get_cost(self, solution_matrix=None):
         """
         Args:
             solution_matrix (array): A list of city indices
         """
-
+        if solution_matrix is None: solution_matrix = self.sol_guess
         # Make sure solution is valid
         if (np.sum(solution_matrix, axis=1)!=np.ones(self.n)).any() or (np.sum(solution_matrix, axis=0)!=np.ones(self.n)).any():
             return np.inf
@@ -298,6 +297,6 @@ if __name__ == "__main__":
     #toy_problem()
 
     cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
-    h = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=.2,
+    h = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.9, learning_rate=.2,
                       force_visit_bias=0, epochs=80, optimal_cost=15)
     h.run_simulations()

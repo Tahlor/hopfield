@@ -12,6 +12,7 @@ else:
 import time
 import numpy as np
 from TSPClasses import *
+from Hopfield import *
 import heapq
 import itertools
 import numpy as np
@@ -309,7 +310,40 @@ class TSPSolver:
         return results
 
     def fancy( self,time_allowance=60.0 ):
-        pass
+        startTime = time.time()
+        cities = self._scenario.getCities()
+        matrix = self.build_matrix()
+        cost = math.inf
+        network = HopfieldNetwork(matrix, improve_tour_factor=.5, learning_rate=.01)
+        while(cost == math.inf):
+            results = network.balanced_stochastic_update(2000)
+            cost = results["Cost"]
+        if(cost != math.inf):
+            path = results["Path"]
+            listOfCities = []
+            for x in path:
+                listOfCities.append(cities[x])
+            soln = TSPSolution(listOfCities)
+            results = {}
+            results['cost'] = cost
+            results['time'] = time.time() - startTime
+            results['count'] = 0
+            results['soln'] = soln
+            results['max'] = 0
+            results['total'] = 0
+            results['pruned'] = 0
+            return results
+
+        results = {}
+        results['cost'] = math.inf
+        results['time'] = time.time() - startTime
+        results['count'] = 0
+        results['soln'] = None
+        results['max'] = 0  # states stored at once
+        results['total'] = 0  # states created
+        results['pruned'] = 0  # states skipped
+        return results
+
 
 if __name__=="__main__":
     x = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
