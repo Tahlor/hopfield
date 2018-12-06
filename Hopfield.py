@@ -105,12 +105,13 @@ class HopfieldNetwork:
         for _ in range(0, iterations):
             i = np.random.randint(0, self.n)
             j = np.random.randint(lower_bound, self.n)
-            h.update_node(i, j)
+            self.update_node(i, j)
 
-        self.report_solution(self.sol_guess)
+        return self.report_solution(self.sol_guess)
 
-    def get_path(self, sol):
+    def get_path(self, sol=None):
         # Take argmax
+        if sol is None: sol = self.sol_guess
         path = np.argmax(sol, axis=0)
 
         # If argmax is actually 0, return -1
@@ -128,6 +129,7 @@ class HopfieldNetwork:
         print("Cost: {}".format(cost))
         print("Valid: {}".format(cost < np.inf))
         print("Happiness: {}".format(happiness))
+        return path, cost
 
     def update_node(self, i, j, learning_rate=None, improve_tour_factor=None):
         """ Update a single node
@@ -199,12 +201,12 @@ class HopfieldNetwork:
 
         return happiness
 
-    def get_cost(self, solution_matrix):
+    def get_cost(self, solution_matrix=None):
         """
         Args:
             solution_matrix (array): A list of city indices
         """
-
+        if solution_matrix is None: solution_matrix = self.sol_guess
         # Make sure solution is valid
         if (np.sum(solution_matrix, axis=1)!=np.ones(self.n)).any() or (np.sum(solution_matrix, axis=0)!=np.ones(self.n)).any():
             return np.inf

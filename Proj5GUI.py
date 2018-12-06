@@ -602,10 +602,10 @@ if __name__ == '__main__':
     #s = Scenario(city_locations=6, difficulty=3, rand_seed=5)
     #print(s.ncities)
     #stop
-    if False:
-        w = Proj5GUI()
-    else:
-        #test()
-        manual()
+    #if False:
+    w = Proj5GUI()
+    #else:
+    #test()
+    # manual()
 
     sys.exit(app.exec())
