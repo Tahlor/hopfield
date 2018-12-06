@@ -38,7 +38,7 @@ VERBOSE = False
 
 class HopfieldNetwork:
 
-    def __init__(self, cost_matrix, initial_guess=None, inf=-.8, improve_tour_factor=1, clamp_first_column=True):
+    def __init__(self, cost_matrix, initial_guess=None, inf=-.8, learning_rate=.1, improve_tour_factor=1, clamp_first_column=True):
         """
         Args:
               cost_matrix (2D npy array): Square matrix, expects np.inf for invalid paths
@@ -63,7 +63,7 @@ class HopfieldNetwork:
 
         self.initialize_guess(initial_guess)
 
-        self.learning_rate = .1
+        self.learning_rate = learning_rate
 
 # add a penalty for update
 
@@ -106,10 +106,19 @@ class HopfieldNetwork:
 
         self.report_solution(self.sol_guess)
 
+    def get_path(self, sol):
+        # Take argmax
+        path = np.argmax(sol, axis=0)
+
+        # If argmax is actually 0, return -1
+        column_sum = np.sum(sol, axis=0)
+        path[column_sum!=1]=-1
+        return path
+
     def report_solution(self, solution):
         sol = np.round(solution)
         happiness = self.get_happiness(sol)
-        path = np.argmax(sol, axis=0)
+        path = self.get_path(sol)
         cost = self.get_cost(sol)
         print(solution)
         print("Solution: {}".format(path))
@@ -131,8 +140,8 @@ class HopfieldNetwork:
         next_city_idx = (j + 1) % self.n  # wrap around to beginning
         indices = np.arange(self.n)
 
-        # Cost matrix
-        update = np.sum(self.sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor #* self.sol_guess[i, j]
+        # Cost matrix - this rewards the system for taking a non-zero path
+        update = np.sum(self.sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor # * self.sol_guess[i, j]
         #update = 0
         # print(i,j)
         # print(self.sol_guess)
@@ -147,12 +156,13 @@ class HopfieldNetwork:
         # No duplicate visit on row
         update += np.sum(self.sol_guess[i, indices != j] * self.negative_weights)
 
-        # Multiply by original node value
+        # Multiply by original node value; without this, the negative weights want to force everything to zero
         update *= self.sol_guess[i, j]
 
         # print(update)
 
-        delta = learning_rate * (1 if update > 0 else -1)  # we can use a tanh here
+        #delta = learning_rate * (1 if update > 0 else -1)  # we can use a tanh here
+        delta = learning_rate * np.arctan(update)  # we can use a tanh here
 
         self.sol_guess[i, j] = max(min(self.sol_guess[i, j] + delta, 1), 0)
         return update
@@ -179,10 +189,10 @@ class HopfieldNetwork:
                 happiness += sol[i, j] * np.sum(sol[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor
 
                 # No duplicate visit on column
-                happiness += np.sum(sol[indices != i, j] * self.negative_weights) #* sol[i, j]
+                happiness += np.sum(sol[indices != i, j] * self.negative_weights) * sol[i, j]
 
                 # No duplicate visit on row
-                happiness += np.sum(sol[i, indices != j] * self.negative_weights) #*sol[i, j]
+                happiness += np.sum(sol[i, indices != j] * self.negative_weights) * sol[i, j]
 
         return happiness
 
@@ -219,15 +229,16 @@ if __name__ == "__main__":
     # values = np.asarray([[1,1,1,1],[1,1,1,1],[1,1,1,1],[1,1,1,1]])
     inferior_solution = np.asarray([[1., 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 1, 0, 0]])
     solution = np.asarray([[1., 0, 0, 0], [0, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0]])
-    solution_noise = np.asarray([[1., 0, 0, 0], [0, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0]])
     noise = np.random.randn(n,n)
     noise[:,0] = 0
+    solution_noise = solution+noise
 
-    guess = None
+
+    guess = solution_noise
     # Solution: 0 2 3 1
     # guess = None
 
-    h = HopfieldNetwork(cost_matrix, initial_guess=guess, improve_tour_factor=1)
-    h.fully_stochastic_update(1000)
+    h = HopfieldNetwork(cost_matrix, initial_guess=guess, improve_tour_factor=.5, learning_rate=.01)
+    h.fully_stochastic_update(2000)
 
 
