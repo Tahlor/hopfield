@@ -311,11 +311,13 @@ class TSPSolver:
 
     def fancy( self,time_allowance=60.0 ):
         startTime = time.time()
-        matrix = self.build_matrix()
         cities = self._scenario.getCities()
+        matrix = self.build_matrix()
+        cost = math.inf
         network = HopfieldNetwork(matrix, improve_tour_factor=.5, learning_rate=.01)
-        results = network.fully_stochastic_update(2000)
-        cost = results[1]
+        while(cost == math.inf):
+            results = network.fully_stochastic_update(2000)
+            cost = results[1]
         if(cost != math.inf):
             path = results[0]
             listOfCities = []
