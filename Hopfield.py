@@ -5,6 +5,8 @@ import time
 """ Todo: 
 
 # Ideas/parameters:
+    ### Work on reporting lots of test results at once
+    
     # Learning rate
     # Think about simulated annealing?
     # Stochastic updates vs batch
@@ -20,7 +22,8 @@ import time
     # Cost matrix
     # Graphical output:
         # Make a circle corresponding to the magnitude of each guess
-
+    # Early stopping
+    
 """
 
 """
