@@ -5,6 +5,9 @@ import pandas as pd
 import collections
 import logging
 import utils
+import multiprocessing
+import os
+import matplotlib.pyplot as plt
 
 """ Todo: 
 
@@ -20,15 +23,11 @@ import utils
         # Fully random updates
         # Update each node 1x per cycle in random order
         # Batch - update all nodes simultaneously (GPU??)
-    # Parallel processing
-        # Use mutliple cores
     # Add noise periodically to push out of bad solutions
     # -inf
         # Increase learning -inf through time
         # Set -inf near largest cost in matrix
-    # Cost matrix
-    # Graphical output:
-        # Make a circle corresponding to the magnitude of each guess
+    # Cost matrix - alternatives
     # Early stopping
     
 """
@@ -135,7 +134,7 @@ class HopfieldNetwork:
             self.update_node(i, j)
         return self.report_solution(self.sol_guess)
 
-    def balanced_stochastic_update(self, iterations=None):
+    def balanced_stochastic_update(self, iterations=None, keep_states=False):
         if not iterations is None:
             epochs = np.ceil(iterations / self.n ** 2)
         else:
@@ -147,6 +146,10 @@ class HopfieldNetwork:
 
         improve_tour_factor = self.improve_tour_factor
 
+        # Keep track of states
+        if keep_states:
+            self.states = []
+
         for e in range(0,epochs):
             # Randomize order
             np.random.shuffle(all_pairs)
@@ -156,7 +159,8 @@ class HopfieldNetwork:
                 #print(":",improve_tour_factor)
             for pair in all_pairs:
                 self.update_node(pair[0],pair[1], self.learning_rate, improve_tour_factor)
-
+            if keep_states:
+                self.states.append(self.sol_guess.copy())
         return self.report_solution(self.sol_guess)
 
     def update_tour_factor(self):
@@ -226,12 +230,13 @@ class HopfieldNetwork:
         update += np.sum(self.sol_guess[i, indices != j] * self.negative_weights)
 
         # Multiply by original node value; without this, the negative weights want to force everything to zero
-        update *= self.sol_guess[i, j]
+        #update *= self.sol_guess[i, j]
 
         # print(update)
 
         #delta = learning_rate * (1 if update > 0 else -1)  # we can use a tanh here
-        delta = learning_rate * np.arctan(update)  # we can use a tanh here
+        #delta = learning_rate * np.arctan(update)  # we can use a tanh here
+        delta = learning_rate * 1 / 2 * (1 + np.arctan(update - self.sol_guess[i, j]))  # we can use a tanh here
 
         self.sol_guess[i, j] = max(min(self.sol_guess[i, j] + delta, 1), 0)
         return update
@@ -284,23 +289,52 @@ class HopfieldNetwork:
             cost += self.original_cost_matrix[src, dest]
         return cost
 
-    def plot_current_state(self):
+    def plot_current_state(self, state=None):
         """ Plot the self.sol_guess matrix, a circle for each matrix cell, radius proportional to magnitude
         """
+        if state is None:
+            state = self.sol_guess
+        r = range(0, self.n)
+        size=200
+        pairs = utils.cartesian_product(r, r)
+        pairs = np.transpose(pairs, (1, 0))
+        plt.scatter(pairs[1], pairs[0], s=state.reshape(-1) ** 2 * size, color="blue")
+        plt.grid(which="major")
+        plt.xticks(np.arange(0, self.n))
+        plt.yticks(np.arange(0, self.n))
+        #plt.draw()
+        plt.show()
 
-        pass
+    def run_simulation(self):
+        self.initialize_guess()
+        return self.balanced_stochastic_update()
 
     def run_simulations(self, simulations=100):
-        results = [self.balanced_stochastic_update()]
+        results = []
+        poolcount = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(processes=poolcount)
+        start = time.time()
         for i in range(0,simulations-1):
-            self.initialize_guess()
-            results.append(self.balanced_stochastic_update())
+            result = pool.apply_async(self.run_simulation)
+            results.append(result.get())
+        pool.close()
+        pool.join()
+        end = time.time()
 
-        df = pd.DataFrame(results)
-        #print(df)
-        df = df.replace([np.inf, -np.inf], np.nan)
-        print(df[["cost"]].dropna(axis=0).mean())
-        print(df.drop(["cost"], axis=1).mean())
+        best_result = results[np.argmin([r['cost'] for r in results])]
+        avg_results = self.summary(results)
+
+        best_result["time"] = end-start
+        best_result["attempts"] = simulations
+        return best_result, avg_results
+
+
+    def make_movie(self):
+        self.initialize_guess()
+        result = self.balanced_stochastic_update(keep_states=True)
+        states = np.asarray(self.states)
+        utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
+        print(result["cost"])
 
     def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update"):
         total_attempts = 0
@@ -313,7 +347,7 @@ class HopfieldNetwork:
             self.initialize_guess()
             result = eval("self.{}()".format(update_method))
             results.append(result)
-
+            #self.plot_current_state()
             if result["cost"] <= self.optimal_cost and self.optimal_cost<inf:
                 found_optimal=True
                 if result["cost"] < self.optimal_cost:
@@ -330,7 +364,9 @@ class HopfieldNetwork:
 
         best_result["time"] = end-start
         best_result["attempts"] = total_attempts
+        return best_result, self.summary(result)
 
+    def summary(self, results):
         # Create summary
         df = pd.DataFrame(results)
         df = df.replace([np.inf, -np.inf], np.nan)
@@ -338,7 +374,7 @@ class HopfieldNetwork:
         avg_everything = df.drop(["cost"], axis=1).mean()
         avg_everything = avg_everything.append(avg_cost)
         print(avg_everything)
-        return best_result, avg_everything
+        return avg_everything
 
 def toy_problem():
     cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
@@ -361,7 +397,19 @@ if __name__ == "__main__":
     #toy_problem()
 
     cost_matrix = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
-    h = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=.2,
-                      force_visit_bias=0, epochs=80, optimal_cost=15, when_to_force_valid=.75, force_valid_factor=10)
+    cost_matrix = [[inf, 884.0, 836.0, 875.0, 1444.0, 578.0, 329.0, 1203.0, 1293.0],
+     [884.0, inf, 332.0, 1719.0, 832.0, 1156.0, 691.0, 1086.0, 2084.0],
+     [836.0, 332.0, inf, 1571.0, 1163.0, 934.0, 548.0, 1371.0, 2116.0],
+     [875.0, 1719.0, 1571.0, inf, 2315.0, 699.0, 1038.0, 1979.0, 1122.0],
+     [1444.0, 832.0, 1163.0, 2315.0, inf, 1892.0, 1404.0, 700.0, 2302.0],
+     [578.0, 1156.0, 934.0, 699.0, 1892.0, inf, 489.0, 1763.0, 1597.0],
+     [329.0, 691.0, 548.0, 1038.0, 1404.0, 489.0, inf, 1327.0, 1616.0],
+     [1203.0, 1086.0, 1371.0, 1979.0, 700.0, 1763.0, 1327.0, inf, 1695.0],
+     [1293.0, 2084.0, 2116.0, 1122.0, 2302.0, 1597.0, 1616.0, 1695.0, inf]]
+    cost_matrix = np.asarray(cost_matrix)
+
+    h = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=1,
+                      force_visit_bias=0, epochs=120, optimal_cost=15, when_to_force_valid=.75, force_valid_factor=10)
     #h.run_simulations()
-    h.run_until_optimal(optimal_cost=15)
+    #h.run_until_optimal()
+    h.make_movie()

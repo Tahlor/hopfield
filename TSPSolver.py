@@ -253,6 +253,7 @@ class TSPSolver:
         np.random.shuffle(unvisited_indices)
         costs = []
         paths = []
+        final_cost = inf
         while time.time()-start_time < time_allowance and unvisited_indices:
             #print(unvisited_indices)
             first = unvisited_indices.pop(0)
@@ -287,7 +288,7 @@ class TSPSolver:
         solution = TSPSolution(self.convert_indices_to_cities(route))
         end_time = time.time()
 
-        results['cost'] = total_cost if not no_path_found else inf
+        results['cost'] = total_cost
         results['time'] = end_time - start_time
         results['count'] = None
         results['soln'] = solution
@@ -330,7 +331,9 @@ class TSPSolver:
             network = HopfieldNetwork(matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=.2,
                           force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10, optimal_cost=optimal_cost)
 
-        best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update")
+        #best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update")
+        best_results, avg_results = network.run_simulations(simulations=100)
+
         listOfCities = []
 
         for x in best_results["path"]:
