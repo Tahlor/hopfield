@@ -8,12 +8,12 @@ from PyQt5.QtCore import *
 # GLobals
 MAX_TIME = 8
 AUTO = False
-SIZE = 9
+SIZE = 5
 EASY=0
 NORMAL=1
 HARD=2
 HARDD=3
-DIFFICULTY = EASY
+DIFFICULTY = HARD
 
 class TSP_Problem():
     def __init__(self):
@@ -62,17 +62,16 @@ def test():
     results = solver.branchAndBound(time_allowance=MAX_TIME)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
     best_cost = float(results["cost"].replace("*",""))
-    # Fancy
-    cost_matrix = solver.build_matrix()
-    #print(matrix.tolist())
-    #Stop
-    network = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=1,
-                      force_visit_bias=0, epochs=120, optimal_cost=best_cost, when_to_force_valid=.75, force_valid_factor=10)
-    results = solver.fancy(time_allowance=MAX_TIME, network=network)
-    print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
 
     # Greedy
     results = solver.greedy(time_allowance=MAX_TIME)
+    print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
+
+    # Fancy
+    cost_matrix = solver.build_matrix()
+    network = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=1,
+                      force_visit_bias=0, epochs=120, optimal_cost=best_cost, when_to_force_valid=.75, force_valid_factor=10)
+    results = solver.fancy(time_allowance=MAX_TIME, network=network, simulations=1000)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
 
     del scenario
@@ -80,7 +79,5 @@ def test():
 if __name__=="__main__":
     test()
 
-# Greedy fails:
-# sz seed
-# 9 172
-# 9 260
+# Good solutions:
+# 5 348

@@ -322,7 +322,7 @@ class TSPSolver:
         results['pruned'] = self.prune        # states skipped
         return results
 
-    def fancy( self,time_allowance=60.0, optimal_cost=inf, network=None):
+    def fancy( self,time_allowance=60.0, optimal_cost=inf, network=None, simulations = 100):
         startTime = time.time()
         cities = self._scenario.getCities()
         cost = math.inf
@@ -332,7 +332,7 @@ class TSPSolver:
                           force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10, optimal_cost=optimal_cost)
 
         #best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update")
-        best_results, avg_results = network.run_simulations(simulations=100)
+        best_results, avg_results = network.run_simulations(simulations=simulations)
 
         listOfCities = []
 
