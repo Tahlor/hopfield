@@ -12,6 +12,7 @@ else:
 import time
 import numpy as np
 from TSPClasses import *
+from Hopfield import *
 import heapq
 import itertools
 import numpy as np
@@ -235,6 +236,7 @@ class TSPSolver:
             In the worst case, we try every possible starting node (if no path is found)
                 So O(n**3) time, O(n**2) space
         """
+
         results = {}
         if cost_matrix is None:
             cities = self._scenario.getCities()
@@ -249,7 +251,10 @@ class TSPSolver:
         no_path_found = True
         unvisited_indices = list(range(0, ncities))
         np.random.shuffle(unvisited_indices)
-        while no_path_found and time.time()-start_time < time_allowance and unvisited_indices:
+        costs = []
+        paths = []
+        while time.time()-start_time < time_allowance and unvisited_indices:
+            #print(unvisited_indices)
             first = unvisited_indices.pop(0)
             route = [first]
             working_matrix = cost_matrix.copy()
@@ -270,10 +275,18 @@ class TSPSolver:
                 # Original cost matrix
                 final_cost = cost_matrix[route[-1], first]
                 if final_cost < inf:
-                    no_path_found = False
                     total_cost += final_cost
+                    costs.append(total_cost)
+                    paths.append(route)
+
+        # find best
+        best_idx = np.argmin(costs)
+        route = paths[best_idx]
+        total_cost = costs[best_idx]
+
         solution = TSPSolution(self.convert_indices_to_cities(route))
         end_time = time.time()
+
         results['cost'] = total_cost if not no_path_found else inf
         results['time'] = end_time - start_time
         results['count'] = None
@@ -308,8 +321,32 @@ class TSPSolver:
         results['pruned'] = self.prune        # states skipped
         return results
 
-    def fancy( self,time_allowance=60.0 ):
-        pass
+    def fancy( self,time_allowance=60.0, optimal_cost=inf, network=None):
+        startTime = time.time()
+        cities = self._scenario.getCities()
+        cost = math.inf
+        if network is None:
+            matrix = self.build_matrix()
+            network = HopfieldNetwork(matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=.2,
+                          force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10, optimal_cost=optimal_cost)
+
+        best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update")
+        listOfCities = []
+
+        for x in best_results["path"]:
+            listOfCities.append(cities[x])
+        soln = TSPSolution(listOfCities)
+        results = {}
+        results['cost'] = best_results['cost']
+        results['time'] = time.time() - startTime
+        results['count'] = best_results['attempts'] # how many iterations to get optimal
+        results['soln'] = soln
+        results['max'] = 0
+        results['total'] = 0
+        results['pruned'] = 0
+        return results
+
+
 
 if __name__=="__main__":
     x = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
