@@ -12,7 +12,15 @@ import matplotlib.pyplot as plt
 """ Todo: 
 
 # Ideas/parameters:
-    # Make parameters learnable
+
+    # Have greedy find good subproblems, feed into hopfield network
+    # Start with Greedy and add noise
+    # Build in some checker to see if done relaxing
+    # Tune parameters
+
+    # Make fully connected - make connections between non-neighboring cities
+    `   # Length is minimal distance to other city
+        # Decays for longer 
 
     # Tune parameters:
         # After 50 iterations, if invalid, increase appropriate bias
@@ -327,7 +335,6 @@ class HopfieldNetwork:
         best_result["time"] = end-start
         best_result["attempts"] = simulations
         return best_result, avg_results
-
 
     def make_movie(self):
         self.initialize_guess()

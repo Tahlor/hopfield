@@ -8,12 +8,12 @@ from PyQt5.QtCore import *
 # GLobals
 MAX_TIME = 8
 AUTO = False
-SIZE = 9
+SIZE = 5
 EASY=0
 NORMAL=1
 HARD=2
 HARDD=3
-DIFFICULTY = EASY
+DIFFICULTY = HARD
 
 class TSP_Problem():
     def __init__(self):
