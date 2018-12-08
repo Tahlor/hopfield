@@ -38,8 +38,11 @@ class TSPSolver:
         cities = self._scenario.getCities()
         return [cities[i] for i in route]
 
-    def build_matrix(self):
-        cities = self._scenario.getCities()
+    def build_matrix(self, cityList=None):
+        if cityList == None:
+            cities = self._scenario.getCities()
+        else:
+            cities = cityList
         # self._cities = [City(pt.x(), pt.y()) for pt in city_locations]
         cost_matrix = np.zeros([len(cities),len(cities)])
 
@@ -349,7 +352,90 @@ class TSPSolver:
         results['pruned'] = 0
         return results
 
+    def makeGreedyClusters(self, preferredSize = 4):
+        cities = self._scenario.getCities().copy()
+        greedyClusters = []
+        currentCity = cities[0]
+        while(len(cities) > 0):
+            clusterList = [cities[0]]
+            del (cities[0])
+            for x in range(0,preferredSize-1):
+                if(len(cities) == 0): break
+                closestCity, closestIndex = self.getClosestUnusedCity(cities[0], currentCity, cities)
+                if(closestCity == None): break # Give up because there was no more close city. Size will be < preferredSize
+                del(cities[closestIndex])
+                clusterList.append(closestCity)
+                currentCity = closestCity
+            greedyClusters.append(GreedyCluster(clusterList))
+        return greedyClusters
 
+    def getClosestUnusedCity(self, initialCity, currentCity, unusedCities):
+        shortestPath = currentCity
+        shortestIndex = -1
+        for x in range(0, len(unusedCities)):
+            if currentCity.costTo(unusedCities[x]) < currentCity.costTo(shortestPath):
+                shortestPath = unusedCities[x]
+                shortestIndex = x
+
+        if shortestPath == currentCity:
+            return None, -1
+
+        return shortestPath, shortestIndex
+
+    def fancyGreedy( self,time_allowance=60.0, optimal_cost=inf, network=None, simulations = 100):
+        cities = self._scenario.getCities()
+        greedyClusters = self.makeGreedyClusters()
+        startTime = time.time()
+
+        hopfield_cost_matrix = np.zeros([len(greedyClusters), len(greedyClusters)])
+
+        for i in range(0, len(greedyClusters)):
+            for j in range(0, len(greedyClusters)): # may not be symmetric distances, otherwise use i not 0
+                if i == j: hopfield_cost_matrix[i,j] = math.inf
+                else:
+                    cityLeft = greedyClusters[i].getExitCity()
+                    cityRight = greedyClusters[j].getEntranceCity()
+                    hopfield_cost_matrix[i, j] = cityLeft.costTo(cityRight)
+
+        network = HopfieldNetwork(hopfield_cost_matrix, improve_tour_factor=1.7, learning_rate=.2,
+                                 force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10,
+                                  optimal_cost=optimal_cost)
+
+        cost = math.inf
+        while cost == math.inf:
+            best_results = network.balanced_stochastic_update(50)
+            cost = best_results['cost']
+
+        #best_results, avg_results = network.run_until_optimal(max_time=time_allowance,
+                                                             # update_method="balanced_stochastic_update")
+
+        mySolution = []
+        for x in best_results['path']:
+            greedyClusterCities = greedyClusters[x].getTourSegment()
+            mySolution.extend(greedyClusterCities)
+        soln = TSPSolution(mySolution)
+        results = {}
+        results['cost'] = soln._costOfRoute()
+        results['time'] = time.time()-startTime
+        results['count'] = 0
+        results['soln'] = soln
+        results['max'] = 0
+        results['total'] = 0
+        results['pruned'] = 0
+        return results
+
+class GreedyCluster:
+    def __init__(self, cities):
+        self.cities = cities
+
+    def getEntranceCity(self):
+        return self.cities[0]
+
+    def getExitCity(self):
+        return self.cities[-1]
+
+    def getTourSegment(self):
+        return self.cities
 
 if __name__=="__main__":
     x = np.asarray([[inf, 7, 3, 12], [3, inf, 6, 14], [5, 8, inf, 6], [9, 3, 5, inf]])
