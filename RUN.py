@@ -8,12 +8,12 @@ from PyQt5.QtCore import *
 # GLobals
 MAX_TIME = 8
 AUTO = False
-SIZE = 10
+SIZE = 5
 EASY=0
 NORMAL=1
 HARD=2
 HARDD=3
-DIFFICULTY = HARD
+DIFFICULTY = EASY
 
 class TSP_Problem():
     def __init__(self):
@@ -70,7 +70,8 @@ def test():
     # Fancy
     cost_matrix = solver.build_matrix()
     network = HopfieldNetwork(cost_matrix, improve_tour_factor=1.7, learning_rate=1,
-                      force_visit_bias=0, epochs=120, optimal_cost=best_cost, when_to_force_valid=.75, force_valid_factor=10)
+                      force_visit_bias=0, epochs=120, optimal_cost=best_cost, when_to_force_valid=.75,
+                      force_valid_factor=10, clamp_first_column=False)
     results = solver.fancy(time_allowance=MAX_TIME, network=network, simulations=200)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
 

@@ -52,6 +52,7 @@ Other:
 
 # GLOBALS
 inf = np.inf
+poolcount = multiprocessing.cpu_count()
 
 ## Logging
 logger = logging.getLogger(__name__)
@@ -312,15 +313,11 @@ class HopfieldNetwork:
         #plt.draw()
         plt.show()
 
-    def run_simulation(self):
-        self.initialize_guess()
+    def run_simulation(self, n=None):
         return self.balanced_stochastic_update()
 
     def run_simulations(self, simulations=100):
         results = {}
-        poolcount = multiprocessing.cpu_count()
-        #poolcount = 1
-        #print(poolcount)
         pool = multiprocessing.Pool(processes=poolcount)
         start = time.time()
         for i in range(0,simulations-1):
@@ -345,24 +342,35 @@ class HopfieldNetwork:
         utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
         print(result["cost"])
 
-    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update"):
+    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=10000):
         total_attempts = 0
-        start = time.time()
-        results = []
         found_optimal = False
+        start = time.time()
 
-        while time.time() - start < max_time:
+        # Dispatch subprocesses
+        pool = multiprocessing.Pool(processes=poolcount)
+        #func = eval("self.{}".format(update_method))
+        #func = self.balanced_stochastic_update
+        func = self.run_simulation
+        results = pool.imap_unordered(func,range(0,max_tries))
+        pool.close()
+
+        # Loop through results as they come in
+        for result in results:
             total_attempts+=1
-            self.initialize_guess()
-            result = eval("self.{}()".format(update_method))
-            results.append(result)
+            print(time.time() - start)
             #self.plot_current_state()
             if result["cost"] <= self.optimal_cost and self.optimal_cost<inf:
                 found_optimal=True
                 if result["cost"] < self.optimal_cost:
                     logger.warn("Provided optimal value was not optimal.")
+                pool.terminate()
                 break
-
+            elif time.time() - start > max_time:
+                print("Out of time")
+                pool.terminate()
+                break
+        pool.join()
         end = time.time()
 
         if found_optimal:
