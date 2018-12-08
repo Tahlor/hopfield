@@ -69,7 +69,7 @@ def test():
 
     # Fancy
     cost_matrix = solver.build_matrix()
-    network = HopfieldNetwork(cost_matrix, improve_tour_factor=1., learning_rate=.1, inhibition_factor=-1,
+    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.5, learning_rate=.1, inhibition_factor=-1,
                       force_visit_bias=.1, epochs=120, optimal_cost=best_cost, when_to_force_valid=.7,
                       force_valid_factor=2, clamp_first_column=False)
     results = solver.fancy(time_allowance=MAX_TIME, network=network, simulations=200)

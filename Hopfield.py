@@ -278,7 +278,8 @@ class HopfieldNetwork:
         update += np.sum(sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor
 
         # Rewards system for previous cities
-        # update += np.sum(sol_guess[:, previous_city_idx] * self.cost_matrix[:, j]) * improve_tour_factor
+        update += np.sum(sol_guess[:, previous_city_idx] * self.cost_matrix[:, i]) * improve_tour_factor
+
 
         # Sum should be n
         # update +=
@@ -474,7 +475,7 @@ if __name__ == "__main__":
      [1293.0, 2084.0, 2116.0, 1122.0, 2302.0, 1597.0, 1616.0, 1695.0, inf]]
     cost_matrix = np.asarray(cost_matrix)
 
-    h = HopfieldNetwork(cost_matrix, improve_tour_factor=.5, learning_rate=.05, inhibition_factor=-1,
+    h = HopfieldNetwork(cost_matrix, improve_tour_factor=.5, learning_rate=.1, inhibition_factor=1,
                       force_visit_bias=0, epochs=200, optimal_cost=15, when_to_force_valid=.75,
                         force_valid_factor=5,clamp_first_column=False)
     #h.run_simulations()
