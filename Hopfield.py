@@ -342,24 +342,24 @@ class HopfieldNetwork:
         utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
         print(result["cost"])
 
-    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=10000):
+    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=200):
         total_attempts = 0
         found_optimal = False
         start = time.time()
-
+        results = []
         # Dispatch subprocesses
         pool = multiprocessing.Pool(processes=poolcount)
         #func = eval("self.{}".format(update_method))
         #func = self.balanced_stochastic_update
         func = self.run_simulation
-        results = pool.imap_unordered(func,range(0,max_tries))
+        temp_results = pool.imap_unordered(func,range(0,max_tries))
         pool.close()
 
         # Loop through results as they come in
-        for result in results:
+        for result in temp_results:
             total_attempts+=1
-            print(time.time() - start)
             #self.plot_current_state()
+            results.append(result)
             if result["cost"] <= self.optimal_cost and self.optimal_cost<inf:
                 found_optimal=True
                 if result["cost"] < self.optimal_cost:
@@ -378,7 +378,6 @@ class HopfieldNetwork:
         else:
             # get minimum cost result
             best_result = results[np.argmin([r['cost'] for r in results])]
-
         best_result["time"] = end-start
         best_result["attempts"] = total_attempts
         return best_result, self.summary(result)

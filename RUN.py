@@ -6,9 +6,9 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 # GLobals
-MAX_TIME = 8
+MAX_TIME = 20
 AUTO = False
-SIZE = 5
+SIZE = 20
 EASY=0
 NORMAL=1
 HARD=2
