@@ -62,7 +62,7 @@ logging.getLogger().addHandler(logging.StreamHandler())
 
 class HopfieldNetwork:
 
-    def __init__(self, cost_matrix, inhibition_factor=-1, epochs=100, learning_rate=.1, improve_tour_factor=1.0,
+    def __init__(self, cost_matrix, inhibition_factor=1, epochs=100, learning_rate=.1, improve_tour_factor=1.0,
                  force_visit_bias=0.0, clamp_first_column=True, optimal_cost=inf, when_to_force_valid=.75, force_valid_factor=1):
         """
         Args:
@@ -85,7 +85,7 @@ class HopfieldNetwork:
         self.n = cost_matrix.shape[0]
         self.improve_tour_factor = improve_tour_factor
         self.clamp_first_column = clamp_first_column
-        self.negative_weights = np.ones(self.n - 1) * inhibition_factor
+        self.negative_weights = -np.ones(self.n - 1)
         self.force_visit_bias = force_visit_bias
         self.optimal_cost = optimal_cost
         self.when_to_force_valid = when_to_force_valid
@@ -252,7 +252,7 @@ class HopfieldNetwork:
         logger.info(result)
         return result
 
-    def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=1):
+    def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
         """ Update a single node
         """
         if improve_tour_factor is None:
@@ -260,6 +260,9 @@ class HopfieldNetwork:
 
         if learning_rate is None:
             learning_rate = self.learning_rate
+
+        if inhibition_factor is None:
+            inhibition_factor = self.inhibition_factor
 
         # i is an index of cities
         # j is an index of city-visit ordering
@@ -274,7 +277,7 @@ class HopfieldNetwork:
         update += np.sum(sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor
 
         # Rewards system for previous cities
-        update += np.sum(sol_guess[:, previous_city_idx] * self.cost_matrix[:, j]) * improve_tour_factor
+        # update += np.sum(sol_guess[:, previous_city_idx] * self.cost_matrix[:, j]) * improve_tour_factor
 
         # Sum should be n
         # update +=
