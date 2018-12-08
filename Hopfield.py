@@ -54,6 +54,7 @@ Other:
 inf = np.inf
 poolcount = multiprocessing.cpu_count()
 
+
 ## Logging
 logger = logging.getLogger(__name__)
 logger.setLevel("WARNING")
@@ -194,7 +195,7 @@ class HopfieldNetwork:
         if keep_states:
             self.states = []
 
-        for e in range(0,epochs):
+        for e in range(0,int(epochs)):
             # Randomize order
             np.random.shuffle(all_pairs)
             VERBOSE = False
