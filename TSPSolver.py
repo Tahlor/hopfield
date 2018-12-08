@@ -328,7 +328,7 @@ class TSPSolver:
         cost = math.inf
         if network is None:
             matrix = self.build_matrix()
-            network = HopfieldNetwork(matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=.2,
+            network = HopfieldNetwork(matrix, improve_tour_factor=1.7, learning_rate=.2,
                           force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10, optimal_cost=optimal_cost)
 
         #best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update")

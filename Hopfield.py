@@ -61,7 +61,7 @@ logging.getLogger().addHandler(logging.StreamHandler())
 
 class HopfieldNetwork:
 
-    def __init__(self, cost_matrix, initial_guess=None, inf=-.8, epochs=100, learning_rate=.1, improve_tour_factor=1.0,
+    def __init__(self, cost_matrix, inf=-.8, epochs=100, learning_rate=.1, improve_tour_factor=1.0,
                  force_visit_bias=0.0, clamp_first_column=True, optimal_cost=inf, when_to_force_valid=.75, force_valid_factor=1):
         """
         Args:
@@ -93,9 +93,7 @@ class HopfieldNetwork:
         self.original_cost_matrix = cost_matrix.copy()
         self.cost_matrix = self.scale_cost_matrix(cost_matrix)
 
-        # Make first guess
-        self.initialize_guess(initial_guess)
-        logger.debug("Guess: \n {}".format(self.sol_guess))
+        #logger.debug("Guess: \n {}".format(self.sol_guess))
 
         self.learning_rate = learning_rate
         self.epochs = epochs
@@ -105,15 +103,13 @@ class HopfieldNetwork:
     def initialize_guess(self, guess=None):
         # Start city doesn't matter, we could always start in 0
         if guess is None:
-            self.sol_guess = np.random.random([self.n, self.n])
+            guess = np.random.random([self.n, self.n])
 
             # Clamp first column
             if self.clamp_first_column:
-                self.sol_guess[:,0] = np.zeros(self.n)
-                self.sol_guess[0,0] = 1
-        else:
-            self.sol_guess = guess
-        #self.report_solution(self.sol_guess)
+                guess[:,0] = np.zeros(self.n)
+                guess[0,0] = 1
+        return guess
 
     def scale_cost_matrix(self, cost_matrix):
         """ Rescale cost matrix, so higher cost routes have smaller weights
@@ -127,26 +123,33 @@ class HopfieldNetwork:
         _max = np.max(cost_matrix)
 
         cost_matrix = 1 - (cost_matrix - _min) / (_max - _min)  # rescale to 0 to 1, then reverse
+
         # After rescaling, make routes impossible again
         cost_matrix[inf_idx] = self.inf
         return cost_matrix
 
-    def fully_stochastic_update(self, iterations=None):
+    def fully_stochastic_update(self, iterations=None, sol_guess=None):
         if iterations is None:
             iterations = self.epochs * self.n ** 2
         lower_bound = 1 if self.clamp_first_column else 0
+
+        if sol_guess is None:
+            sol_guess = self.initialize_guess()
 
         for _ in range(0, iterations):
             i = np.random.randint(0, self.n)
             j = np.random.randint(lower_bound, self.n)
             self.update_node(i, j)
-        return self.report_solution(self.sol_guess)
+        return self.report_solution(sol_guess)
 
-    def balanced_stochastic_update(self, iterations=None, keep_states=False):
+    def balanced_stochastic_update(self, iterations=None, keep_states=False, sol_guess=None):
         if not iterations is None:
             epochs = np.ceil(iterations / self.n ** 2)
         else:
             epochs = self.epochs
+        if sol_guess is None:
+            sol_guess = self.initialize_guess()
+
         lower_bound = 1 if self.clamp_first_column else 0
         i_s = range(0, self.n)
         j_s = range(lower_bound, self.n)
@@ -163,16 +166,18 @@ class HopfieldNetwork:
             np.random.shuffle(all_pairs)
 
             if e > e * self.when_to_force_valid:
-                improve_tour_factor = self.update_tour_factor()
+                improve_tour_factor = self.update_tour_factor(sol_guess)
                 #print(":",improve_tour_factor)
-            for pair in all_pairs:
-                self.update_node(pair[0],pair[1], self.learning_rate, improve_tour_factor)
-            if keep_states:
-                self.states.append(self.sol_guess.copy())
-        return self.report_solution(self.sol_guess)
 
-    def update_tour_factor(self):
-        path = self.get_path(self.sol_guess)
+            for pair in all_pairs:
+                self.update_node(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor)
+
+            if keep_states:
+                self.states.append(sol_guess.copy())
+        return self.report_solution(sol_guess)
+
+    def update_tour_factor(self, sol_guess):
+        path = self.get_path(sol_guess)
         improve_tour_factor = self.improve_tour_factor
         if -1 in path and -2 not in path: # not enough city visits
             improve_tour_factor = self.improve_tour_factor * self.force_valid_factor
@@ -182,7 +187,6 @@ class HopfieldNetwork:
 
     def get_path(self, sol=None):
         # Take argmax
-        if sol is None: sol = self.sol_guess
         path = np.argmax(sol, axis=0)
 
         # If argmax is actually 0, return -1
@@ -214,7 +218,7 @@ class HopfieldNetwork:
         logger.info(result)
         return result
 
-    def update_node(self, i, j, learning_rate=None, improve_tour_factor=None):
+    def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None):
         """ Update a single node
         """
         if improve_tour_factor is None:
@@ -229,27 +233,27 @@ class HopfieldNetwork:
         indices = np.arange(self.n)
 
         # Cost matrix - this rewards the system for taking a non-zero path
-        update = np.sum(self.sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor + self.force_visit_bias
+        update = np.sum(sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor + self.force_visit_bias
 
         # No duplicate visit on column
-        update += np.sum(self.sol_guess[indices != i, j] * self.negative_weights)
+        update += np.sum(sol_guess[indices != i, j] * self.negative_weights)
 
         # No duplicate visit on row
-        update += np.sum(self.sol_guess[i, indices != j] * self.negative_weights)
+        update += np.sum(sol_guess[i, indices != j] * self.negative_weights)
 
         # Multiply by original node value; without this, the negative weights want to force everything to zero
-        #update *= self.sol_guess[i, j]
+        #update *= sol_guess[i, j]
 
         # print(update)
 
         #delta = learning_rate * (1 if update > 0 else -1)  # we can use a tanh here
         #delta = learning_rate * np.arctan(update)  # we can use a tanh here
-        delta = learning_rate * 1 / 2 * (1 + np.arctan(update - self.sol_guess[i, j]))  # we can use a tanh here
+        delta = learning_rate * 1 / 2 * (1 + np.arctan(update - sol_guess[i, j]))  # we can use a tanh here
 
-        self.sol_guess[i, j] = max(min(self.sol_guess[i, j] + delta, 1), 0)
-        return update
+        sol_guess[i, j] = max(min(sol_guess[i, j] + delta, 1), 0)
+        return sol_guess
 
-    def get_happiness(self, sol=None, improve_tour_factor=None):
+    def get_happiness(self, sol, improve_tour_factor=None):
         """ Calculate 'happiness' of network. This is -energy (maximize happiness, minimize energy/entropy)
             Depends on network topology (how we choose to connect nodes)
 
@@ -259,8 +263,6 @@ class HopfieldNetwork:
         if improve_tour_factor is None:
             improve_tour_factor = self.improve_tour_factor
 
-        if sol is None:
-            sol = self.sol_guess
         indices = np.arange(self.n)
         happiness = 0
         for i in range(0, self.n):
@@ -283,7 +285,6 @@ class HopfieldNetwork:
         Args:
             solution_matrix (array): A list of city indices
         """
-        if solution_matrix is None: solution_matrix = self.sol_guess
         # Make sure solution is valid
         if (np.sum(solution_matrix, axis=1)!=np.ones(self.n)).any() or (np.sum(solution_matrix, axis=0)!=np.ones(self.n)).any():
             return np.inf
@@ -297,11 +298,9 @@ class HopfieldNetwork:
             cost += self.original_cost_matrix[src, dest]
         return cost
 
-    def plot_current_state(self, state=None):
-        """ Plot the self.sol_guess matrix, a circle for each matrix cell, radius proportional to magnitude
+    def plot_current_state(self, state):
+        """ Plot the sol_guess matrix, a circle for each matrix cell, radius proportional to magnitude
         """
-        if state is None:
-            state = self.sol_guess
         r = range(0, self.n)
         size=200
         pairs = utils.cartesian_product(r, r)
@@ -318,16 +317,18 @@ class HopfieldNetwork:
         return self.balanced_stochastic_update()
 
     def run_simulations(self, simulations=100):
-        results = []
+        results = {}
         poolcount = multiprocessing.cpu_count()
-        poolcount = 1
+        #poolcount = 1
+        #print(poolcount)
         pool = multiprocessing.Pool(processes=poolcount)
         start = time.time()
         for i in range(0,simulations-1):
-            result = pool.apply_async(self.run_simulation)
-            results.append(result.get())
+            results[i] = pool.apply_async(self.run_simulation)
         pool.close()
         pool.join()
+        results = [r.get() for r in results.values()]
+
         end = time.time()
 
         best_result = results[np.argmin([r['cost'] for r in results])]
@@ -398,7 +399,7 @@ def toy_problem():
     # Solution: 0 2 3 1
     # guess = None
 
-    h = HopfieldNetwork(cost_matrix, initial_guess=guess, improve_tour_factor=.5, learning_rate=.01, force_visit_bias=.5)
+    h = HopfieldNetwork(cost_matrix, improve_tour_factor=.5, learning_rate=.01, force_visit_bias=.5)
     h.fully_stochastic_update(2000)
 
 if __name__ == "__main__":
@@ -416,7 +417,7 @@ if __name__ == "__main__":
      [1293.0, 2084.0, 2116.0, 1122.0, 2302.0, 1597.0, 1616.0, 1695.0, inf]]
     cost_matrix = np.asarray(cost_matrix)
 
-    h = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=1,
+    h = HopfieldNetwork(cost_matrix, improve_tour_factor=1.7, learning_rate=1,
                       force_visit_bias=0, epochs=120, optimal_cost=15, when_to_force_valid=.75, force_valid_factor=10)
     #h.run_simulations()
     #h.run_until_optimal()

@@ -8,7 +8,7 @@ from PyQt5.QtCore import *
 # GLobals
 MAX_TIME = 8
 AUTO = False
-SIZE = 5
+SIZE = 10
 EASY=0
 NORMAL=1
 HARD=2
@@ -69,9 +69,9 @@ def test():
 
     # Fancy
     cost_matrix = solver.build_matrix()
-    network = HopfieldNetwork(cost_matrix, initial_guess=None, improve_tour_factor=1.7, learning_rate=1,
+    network = HopfieldNetwork(cost_matrix, improve_tour_factor=1.7, learning_rate=1,
                       force_visit_bias=0, epochs=120, optimal_cost=best_cost, when_to_force_valid=.75, force_valid_factor=10)
-    results = solver.fancy(time_allowance=MAX_TIME, network=network, simulations=1000)
+    results = solver.fancy(time_allowance=MAX_TIME, network=network, simulations=200)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
 
     del scenario
