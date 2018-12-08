@@ -4,21 +4,25 @@ from Hopfield import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+import pandas as pd
 
 # GLobals
-MAX_TIME = 10
+MAX_TIME = 5
+MAX_TIME_FANCY = 20
 AUTO = False
-SIZE = 8
+SIZE = 20
 EASY=0
 NORMAL=1
 HARD=2
 HARDD=3
-DIFFICULTY = EASY
+DIFFICULTY = HARD
+rand_seed = np.random.randint(0, 1000)
+rand_seed = 10
 
 class TSP_Problem():
     def __init__(self):
         SCALE=1
-        self.data_range = {'x': [-1.5 * SCALE, 1.5 * SCALE], \
+        self.data_range = {'x': [-1.5 * SCALE, 1.5 * SCALE],
                            'y': [-SCALE, SCALE]}
 
         #self.solver = TSPSolver(self.view)
@@ -54,7 +58,6 @@ def test():
     print("Cities",	"Seed",	"Running Time",	"Cost of best tour found",	"Max # of stored states at a given time	", "# of BSSF updates",	"Total # of states created",	"Total # of states pruned")
 
     # Generate scenario
-    rand_seed = np.random.randint(0, 1000)
     scenario = w.generateNetwork_nogui(DIFFICULTY, rand_seed, SIZE)
     solver.setupWithScenario(scenario)
 
@@ -67,12 +70,26 @@ def test():
     results = solver.greedy(time_allowance=MAX_TIME)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
 
+    # Random
+    results=[]
+    start = time.time()
+    for i in range(0,100):
+    #while time.time()-start < MAX_TIME:
+        results.append(solver.defaultRandomTour(time_allowance=MAX_TIME))
+    results = pd.DataFrame(results)
+    total_time = results["time"].sum()
+    total_iterations = len(results)
+    results = results.replace([np.inf, -np.inf], np.nan)
+    avg_cost = results[["cost"]].dropna(axis=0).mean()[0]
+    best_random_cost = results[["cost"]].dropna(axis=0).min()[0]
+    print(SIZE, rand_seed, total_time, avg_cost, best_random_cost, total_iterations)
+
     # Fancy
     cost_matrix = solver.build_matrix()
-    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.5, learning_rate=.1, inhibition_factor=-1,
-                      force_visit_bias=.1, epochs=120, optimal_cost=best_cost, when_to_force_valid=.7,
-                      force_valid_factor=2, clamp_first_column=False)
-    results = solver.fancy(time_allowance=MAX_TIME, network=network, simulations=200)
+    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1,
+                      force_visit_bias=.0, epochs=SIZE*10, optimal_cost=best_cost, when_to_force_valid=.75,
+                      force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1)
+    results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=1000)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
 
     del scenario
