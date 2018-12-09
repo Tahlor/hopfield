@@ -331,7 +331,7 @@ class TSPSolver:
         cost = math.inf
         if network is None:
             matrix = self.build_matrix()
-            network = HopfieldNetwork(matrix, improve_tour_factor=.5, learning_rate=.1, inhibition_factor=1,
+            network = HopfieldNetwork(matrix, improve_tour_factor=.5, learning_rate=.11, inhibition_factor=1,
                           force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10, optimal_cost=optimal_cost)
 
         best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update")
@@ -344,7 +344,8 @@ class TSPSolver:
         soln = TSPSolution(listOfCities)
         results = {}
         results['cost'] = best_results['cost']
-        results['time'] = time.time() - startTime
+        #results['time'] = time.time() - startTime
+        results['time'] = best_results['time']
         results['count'] = best_results['attempts'] # how many iterations to get optimal
         results['soln'] = soln
         results['max'] = 0

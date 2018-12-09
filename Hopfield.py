@@ -99,6 +99,7 @@ class HopfieldNetwork:
 
         self.learning_rate = learning_rate
         self.epochs = epochs
+        self.states = []
 
 # add a penalty for update??
 
@@ -144,14 +145,14 @@ class HopfieldNetwork:
             self.update_node(i, j)
         return self.report_solution(sol_guess)
 
-    def balanced_stochastic_update(self, iterations=None, keep_states=False, sol_guess=None):
+    def balanced_stochastic_update(self, iterations=None, keep_states=True, sol_guess=None):
         if not iterations is None:
             epochs = np.ceil(iterations / self.n ** 2)
         else:
             epochs = self.epochs
         if sol_guess is None:
             sol_guess = self.initialize_guess()
-
+        
         lower_bound = 1 if self.clamp_first_column else 0
         i_s = range(0, self.n)
         j_s = range(lower_bound, self.n)
@@ -162,7 +163,7 @@ class HopfieldNetwork:
 
         # Keep track of states
         if keep_states:
-            self.states = []
+            states = []
 
         for e in range(0,int(epochs)):
             # Randomize order
@@ -180,20 +181,24 @@ class HopfieldNetwork:
                         if VERBOSE:
                             print("too few", i, j)
                         self.update_node(i,j , sol_guess=sol_guess, learning_rate=self.learning_rate,
-                                         improve_tour_factor=improve_tour_factor*self.force_valid_factor)
+                                         improve_tour_factor=improve_tour_factor)
                 for i in too_many_rows:
                     for j in too_many_columns:
                         if VERBOSE:
                             print("too many", i,j)
                         self.update_node(i, j, sol_guess=sol_guess, learning_rate=self.learning_rate,
-                                         inhibition_factor=inhibition_factor*self.force_valid_factor)
+                                         inhibition_factor=inhibition_factor)
 
             for pair in all_pairs:
                 self.update_node(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
 
             if keep_states:
                 self.states.append(sol_guess.copy())
-        return self.report_solution(sol_guess)
+##        if keep_states:
+##            #print("got here")
+##            for state in states:
+##                self.states.append(state.copy())
+        return self.report_solution(sol_guess), self.states
 
     def global_update_tour_factor(self, sol_guess):
         path = self.get_path(np.round(sol_guess))
@@ -355,6 +360,7 @@ class HopfieldNetwork:
         """
         r = range(0, self.n)
         size=200
+        #print("mah")
         pairs = utils.cartesian_product(r, r)
         pairs = np.transpose(pairs, (1, 0))
         plt.scatter(pairs[0],pairs[1], s=state.reshape(-1) ** 2 * size, color="blue")
@@ -387,11 +393,14 @@ class HopfieldNetwork:
         return best_result, avg_results
 
     def make_movie(self):
-        self.initialize_guess()
-        result = self.balanced_stochastic_update(keep_states=True)
+        if not self.states:
+            self.initialize_guess()
+            result = self.balanced_stochastic_update(keep_states=True)
+            print(result["cost"])
+        
         states = np.asarray(self.states)
         utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
-        print(result["cost"])
+        
 
     def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=200):
         total_attempts = 0
@@ -405,12 +414,13 @@ class HopfieldNetwork:
         func = self.run_simulation
         temp_results = pool.imap_unordered(func,range(0,max_tries))
         pool.close()
-
+        states1=[]
         # Loop through results as they come in
-        for result in temp_results:
+        for (result, states) in temp_results:
             total_attempts+=1
             #self.plot_current_state()
             results.append(result)
+            states1.append(states)
             if result["cost"] <= self.optimal_cost and self.optimal_cost<inf:
                 found_optimal=True
                 if result["cost"] < self.optimal_cost:
@@ -424,6 +434,10 @@ class HopfieldNetwork:
         pool.join()
         end = time.time()
 
+        for states in states1:
+            for state in states:
+                self.states.append(state.copy())
+        
         if found_optimal:
             best_result = result
         else:
@@ -431,6 +445,7 @@ class HopfieldNetwork:
             best_result = results[np.argmin([r['cost'] for r in results])]
         best_result["time"] = end-start
         best_result["attempts"] = total_attempts
+        self.make_movie()
         return best_result, self.summary(results)
 
     def summary(self, results):
