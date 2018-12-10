@@ -352,40 +352,9 @@ class TSPSolver:
         results['pruned'] = 0
         return results
 
-    def makeGreedyClusters(self, preferredSize = 4):
-        cities = self._scenario.getCities().copy()
-        greedyClusters = []
-        currentCity = cities[0]
-        while(len(cities) > 0):
-            clusterList = [cities[0]]
-            del (cities[0])
-            for x in range(0,preferredSize-1):
-                if(len(cities) == 0): break
-                closestCity, closestIndex = self.getClosestUnusedCity(cities[0], currentCity, cities)
-                if(closestCity == None): break # Give up because there was no more close city. Size will be < preferredSize
-                del(cities[closestIndex])
-                clusterList.append(closestCity)
-                currentCity = closestCity
-            greedyClusters.append(GreedyCluster(clusterList))
-        return greedyClusters
 
-    def getClosestUnusedCity(self, initialCity, currentCity, unusedCities):
-        shortestPath = currentCity
-        shortestIndex = -1
-        for x in range(0, len(unusedCities)):
-            if currentCity.costTo(unusedCities[x]) < currentCity.costTo(shortestPath):
-                shortestPath = unusedCities[x]
-                shortestIndex = x
-
-        if shortestPath == currentCity:
-            return None, -1
-
-        return shortestPath, shortestIndex
-
-    def fancyGreedy( self,time_allowance=60.0, optimal_cost=inf, network=None, simulations = 100):
-        cities = self._scenario.getCities()
+    def fancyGreedy(self, time_allowance=60.0, optimal_cost=inf):
         greedyClusters = self.makeGreedyClusters()
-        startTime = time.time()
 
         hopfield_cost_matrix = np.zeros([len(greedyClusters), len(greedyClusters)])
 
@@ -401,13 +370,14 @@ class TSPSolver:
                                  force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10,
                                   optimal_cost=optimal_cost)
 
+        startTime = time.time()
         cost = math.inf
-        while cost == math.inf:
+        while cost == math.inf and time.time() - startTime < time_allowance:
             best_results = network.balanced_stochastic_update(50)
             cost = best_results['cost']
 
         #best_results, avg_results = network.run_until_optimal(max_time=time_allowance,
-                                                             # update_method="balanced_stochastic_update")
+                                                              #update_method="balanced_stochastic_update")
 
         mySolution = []
         for x in best_results['path']:
@@ -424,6 +394,40 @@ class TSPSolver:
         results['pruned'] = 0
         return results
 
+    def makeGreedyClusters(self, preferredSize = 10):
+        cities = self._scenario.getCities().copy()
+        greedyClusters = []
+        while(len(cities) > 0):
+            currentCity = cities[0]
+            clusterList = [cities[0]]
+            del (cities[0])
+            for x in range(0,preferredSize-1):
+                if(len(cities) == 0): break
+                closestCity, closestIndex = self.getClosestUnusedCity(currentCity, cities)
+                if(closestCity == None): break # Give up because there was no more connected city. Size will be < preferredSize
+                del(cities[closestIndex])
+                clusterList.append(closestCity)
+                currentCity = closestCity
+            greedyClusters.append(GreedyCluster(clusterList))
+        return greedyClusters
+
+    def getClosestUnusedCity(self, currentCity, unusedCities):
+        shortestPath = currentCity
+        shortestIndex = -1
+        for x in range(0, len(unusedCities)):
+            if currentCity.costTo(unusedCities[x]) < currentCity.costTo(shortestPath):
+                shortestPath = unusedCities[x]
+                shortestIndex = x
+
+        if shortestPath == currentCity:
+            return None, -1
+
+        return shortestPath, shortestIndex
+
+'''
+GreedyCluster represents a small selection of connected cities that we can put into the hopfield network. This is
+useful when we want to find a path for a very large number of nodes.
+'''
 class GreedyCluster:
     def __init__(self, cities):
         self.cities = cities
