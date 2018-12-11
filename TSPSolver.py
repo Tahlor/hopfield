@@ -231,6 +231,52 @@ class TSPSolver:
         results['pruned'] = None
         return results
 
+    def smartRandomTour( self, time_allowance=60.0 ):
+        results = {}
+        cities = self._scenario.getCities()
+        ncities = len(cities)
+        foundTour = False
+        count = 0
+        bssf = None
+        start_time = time.time()
+        cost_matrix = self.build_matrix(cities)
+        perm = np.random.permutation(ncities)
+        while not foundTour and time.time()-start_time < time_allowance:
+            # create a random permutation
+            route = [perm[count]]
+            unvisited = set(perm)
+            # Now build the route using the random permutation
+            unvisited.remove(perm[0])
+            invalid_tour=False
+            for i in range(1, ncities ):
+                #print(route[-1], cost_matrix)
+                neighbors = set(np.where(cost_matrix[route[-1]]<np.inf)[0])
+                possible_visits = unvisited.intersection(neighbors)
+                if len(possible_visits)==0:
+                    invalid_tour=True
+                    break
+                [next]=random.sample(possible_visits,1)
+                route.append(next)
+                unvisited.remove(next)
+            if invalid_tour:
+                continue
+            route=[cities[s] for s in route]
+            bssf = TSPSolution(route)
+            count += 1
+            if bssf.cost < np.inf:
+                # Found a valid route
+                foundTour = True
+        end_time = time.time()
+        results['cost'] = bssf.cost if foundTour else inf
+        results['time'] = end_time - start_time
+        results['count'] = count
+        results['soln'] = bssf
+        results['max'] = None
+        results['total'] = None
+        results['pruned'] = None
+        return results
+
+
     def greedy(self, time_allowance=60.0, cost_matrix=None):
         """ Do a greedy search
             For any particular city, we create the cost matrix, which is O(n**2) time/space
@@ -325,7 +371,7 @@ class TSPSolver:
         results['pruned'] = self.prune        # states skipped
         return results
 
-    def fancy( self,time_allowance=60.0, optimal_cost=inf, network=None, simulations = 100):
+    def fancy( self,time_allowance=60.0, optimal_cost=inf, network=None, simulations = 100, guess = None):
         startTime = time.time()
         cities = self._scenario.getCities()
         cost = math.inf
@@ -333,8 +379,7 @@ class TSPSolver:
             matrix = self.build_matrix()
             network = HopfieldNetwork(matrix, improve_tour_factor=.5, learning_rate=.1, inhibition_factor=1,
                           force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10, optimal_cost=optimal_cost)
-
-        best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update")
+        best_results, avg_results = network.run_until_optimal(max_time=time_allowance, update_method="balanced_stochastic_update", guess=guess)
         #best_results, avg_results = network.run_simulations(simulations=simulations)
 
         listOfCities = []

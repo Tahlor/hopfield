@@ -182,6 +182,8 @@ class HopfieldNetwork:
             epochs = self.epochs
         if sol_guess is None:
             sol_guess = self.initialize_guess()
+        else:
+            sol_guess = sol_guess.copy()
 
         lower_bound = 1 if self.clamp_first_column else 0
         i_s = range(0, self.n)
@@ -310,7 +312,8 @@ class HopfieldNetwork:
              'optimal': cost==self.optimal_cost,
              'path':path,
              'too few cities': counts[-1],
-             'too many cities': counts[-2]
+             'too many cities': counts[-2],
+             'completion_score': self.completion_score(sol_guess=solution)
                   }
 
         logger.info(result)
@@ -439,8 +442,9 @@ class HopfieldNetwork:
         #plt.draw()
         plt.show()
 
-    def run_simulation(self, n=None):
-        return self.balanced_stochastic_update()
+    def run_simulation(self, sol_guess=None):
+        #print(sol_guess)
+        return self.balanced_stochastic_update(sol_guess=sol_guess)
 
     def run_simulations(self, simulations=100):
         results = {}
@@ -468,7 +472,7 @@ class HopfieldNetwork:
         utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
         print(result["cost"])
 
-    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=200):
+    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=500, guess=None):
         total_attempts = 0
         found_optimal = False
         start = time.time()
@@ -478,7 +482,7 @@ class HopfieldNetwork:
         #func = eval("self.{}".format(update_method))
         #func = self.balanced_stochastic_update
         func = self.run_simulation
-        temp_results = pool.imap_unordered(func,range(0,max_tries))
+        temp_results = pool.imap_unordered(func,max_tries*[guess])
         pool.close()
 
         # Loop through results as they come in
@@ -507,6 +511,10 @@ class HopfieldNetwork:
         best_result["time"] = end-start
         best_result["attempts"] = total_attempts
         return best_result, self.summary(results)
+
+    def completion_score(self, sol_guess):
+        # Higher means the further we are from convergence
+        return (self.n - np.sum(sol_guess[sol_guess>.5]))/self.n
 
     def summary(self, results):
         # Create summary

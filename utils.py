@@ -38,3 +38,9 @@ def create_movie(data, path, plt_func=None, fps=1):
             plt_func(data[int(i * factor)])
             writer.grab_frame()
             plt.clf()
+
+def one_hot(labels):
+    labels = np.asarray(labels)
+    b = np.zeros((labels.size, labels.max() + 1))
+    b[np.arange(labels.size), labels] = 1
+    return b
