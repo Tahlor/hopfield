@@ -148,11 +148,13 @@ class HopfieldNetwork:
             self.update_node(i, j)
         return self.report_solution(sol_guess)
 
-    def shock_out_of_invalid(self, sol_guess):
-        sum_cols = np.where(sol_guess.sum(axis=1) > 1.4)[0]
-        sum_rows = np.where(sol_guess.sum(axis=0) > 1.4)[0]
-        sum_cols0 = np.where(sol_guess.sum(axis=1) < .3)[0]
-        sum_rows0 = np.where(sol_guess.sum(axis=0) < .3)[0]
+    def shock_out_of_invalid(self, sol_guess, verbose=False):
+        if verbose:
+            print(sol_guess)
+        sum_rows = np.where(sol_guess.sum(axis=1) > 1.4)[0]
+        sum_cols = np.where(sol_guess.sum(axis=0) > 1.4)[0]
+        sum_rows0 = np.where(sol_guess.sum(axis=1) < .5)[0]
+        sum_cols0 = np.where(sol_guess.sum(axis=0) < .5)[0]
 
         # print(sum_cols, sum_rows)
         # pairs = utils.cartesian_product(sum_cols, sum_rows)
@@ -173,6 +175,8 @@ class HopfieldNetwork:
             for i in sum_rows0:
                 for j in range(0, self.n):
                     sol_guess[i, j] += .4
+        if verbose:
+            print(sol_guess)
         return sol_guess
 
     def balanced_stochastic_update(self, iterations=None, keep_states=False, sol_guess=None):
@@ -465,9 +469,10 @@ class HopfieldNetwork:
         best_result["attempts"] = simulations
         return best_result, avg_results
 
-    def make_movie(self):
-        self.initialize_guess()
-        result = self.balanced_stochastic_update(keep_states=True)
+    def make_movie(self, guess=None):
+        if guess is None:
+            guess = self.initialize_guess()
+        result = self.balanced_stochastic_update(keep_states=True, sol_guess=guess)
         states = np.asarray(self.states)
         utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
         print(result["cost"])
