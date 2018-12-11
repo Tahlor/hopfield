@@ -91,11 +91,15 @@ def test():
 
     # Fancy
     cost_matrix = solver.build_matrix()
-    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1,
-                      force_visit_bias=.0, epochs=150, optimal_cost=best_cost, when_to_force_valid=.6,
-                      force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1)
+    # network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1,
+    #                   force_visit_bias=.0, epochs=150, optimal_cost=best_cost, when_to_force_valid=1.1,
+    #                   force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1)
+
+    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1.1,
+                      force_visit_bias=.0, epochs=250, optimal_cost=best_cost, when_to_force_valid=.65,
+                      force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1, global_inhibition_factor=1)
     if True:
-        results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=1000, guess=None, run_until_optimal=False)
+        results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=100, guess=None, run_until_optimal=True)
         print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
     else:
         network.make_movie(one_hot)

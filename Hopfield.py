@@ -53,7 +53,7 @@ Other:
 # GLOBALS
 inf = np.inf
 poolcount = multiprocessing.cpu_count()
-#poolcount=1
+poolcount=1
 
 ## Logging
 logger = logging.getLogger(__name__)
@@ -248,8 +248,10 @@ class HopfieldNetwork:
                 #print(improve_tour_factor, inhibition_factor)
 
             # Random order updates
+            temp = -1 / ((e+1) * 1 / epochs)
             for pair in all_pairs:
-                self.update_node(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+                #sol_guess =     self.update_node(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+                sol_guess = self.annealing_update(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor, temperature=temp)
 
             if keep_states:
                 self.states.append(sol_guess.copy())
@@ -323,14 +325,9 @@ class HopfieldNetwork:
         logger.info(result)
         return result
 
-    def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
-        """ Update a single node
-        """
+    def calculate_delta(self,i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
         if improve_tour_factor is None:
             improve_tour_factor = self.improve_tour_factor
-
-        if learning_rate is None:
-            learning_rate = self.learning_rate
 
         if inhibition_factor is None:
             inhibition_factor = self.inhibition_factor
@@ -350,17 +347,6 @@ class HopfieldNetwork:
         # Rewards system for previous cities
         # update += np.sum(sol_guess[:, previous_city_idx] * self.cost_matrix[:, i]) * improve_tour_factor
 
-        # print(i,j)
-        # print(sol_guess)
-        # print(self.cost_matrix)
-        # print(sol_guess[:, previous_city_idx])
-        # print(self.cost_matrix[:, i])
-        # time.sleep(1)
-        # Stop
-
-        # Sum should be n
-        # update +=
-
         # Global inhibition - neg if too many
         g = (self.n-np.sum(sol_guess)) * self.global_inhibition_factor # / self.n
         update += g
@@ -379,12 +365,55 @@ class HopfieldNetwork:
 
         #delta = learning_rate * (1 if update > 0 else -1)  # we can use a tanh here
         #delta = learning_rate * np.arctan(update)  # we can use a tanh here
-        delta = learning_rate * update
+
+        #delta = learning_rate * update
+        delta = np.sign(update) * learning_rate
 
         #delta = learning_rate * 1 / 2 * (1 + np.arctan(update - sol_guess[i, j]))  # we can use a tanh here
         #delta = learning_rate * (np.arctan(update - sol_guess[i, j]))  # we can use a tanh here
+        return delta
 
+    def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
+        """ Update a single node
+        """
+        if learning_rate is None:
+            learning_rate = self.learning_rate
+
+
+        delta = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+        #print(delta)
         sol_guess[i, j] = max(min(sol_guess[i, j] + delta, 1), 0)
+        return sol_guess
+
+    def annealing_update(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None, temperature=1):
+        """ Use NEGATIVE temperature with happiness
+        """
+
+        if learning_rate is None:
+            learning_rate = self.learning_rate
+        temperature = abs(temperature)
+        temperature = .1
+        #print(i,j)
+        delta = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+        # sol_guess1 = sol_guess.copy()
+        # sol_guess0 = sol_guess.copy()
+        # sol_guess1[i, j] = 1
+        # sol_guess0[i, j] = 0
+        #
+        # e1 = self.get_happiness(sol_guess1)
+        # e0 = self.get_happiness(sol_guess0)
+
+        # if update is negative, e0 is preferred => higher happiness
+        #p1 = 1/(1+np.exp(-(e0-e1)/temperature))
+        #print(delta)
+        p1 = round(1 / (1 + np.exp(-(delta) / temperature)),4)
+        #print(p1)
+        step_direction = np.random.random() <= p1
+        #print(step_direction)
+        #delta = (step_direction*2-1) * learning_rate
+        #print(delta)
+        sol_guess[i, j] = max(min(sol_guess[i, j] + delta, 1), 0)
+        #Stop
         return sol_guess
 
     def get_happiness(self, sol, improve_tour_factor=None):
@@ -542,7 +571,7 @@ class HopfieldNetwork:
 
     def completion_score(self, sol_guess):
         # Higher means the further we are from convergence
-        return (self.n - np.sum(sol_guess[sol_guess>.5]))/self.n
+        return abs(self.n - np.sum(sol_guess[sol_guess>.5]))/self.n
 
     def summary(self, results):
         # Create summary
