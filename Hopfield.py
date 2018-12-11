@@ -355,7 +355,6 @@ class HopfieldNetwork:
         # Global inhibition - neg if too many
         g = (self.n-np.sum(sol_guess)) * self.global_inhibition_factor # / self.n
         update += g
-        #print(update, g)
 
         # No duplicate visit on column
         update += np.sum(sol_guess[indices != i, j] * self.negative_weights) * abs(inhibition_factor)
@@ -363,18 +362,6 @@ class HopfieldNetwork:
         # No duplicate visit on row
         update += np.sum(sol_guess[i, indices != j] * self.negative_weights) * abs(inhibition_factor)
 
-        # Multiply by original node value; without this, the negative weights want to force everything to zero
-        #update *= sol_guess[i, j]
-
-        # print(update)
-
-        #delta = learning_rate * (1 if update > 0 else -1)  # we can use a tanh here
-        #delta = learning_rate * np.arctan(update)  # we can use a tanh here
-
-        #delta = learning_rate * update
-
-        #delta = learning_rate * 1 / 2 * (1 + np.arctan(update - sol_guess[i, j]))  # we can use a tanh here
-        #delta = learning_rate * (np.arctan(update - sol_guess[i, j]))  # we can use a tanh here
         return update
 
     def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
@@ -502,7 +489,7 @@ class HopfieldNetwork:
         utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
         print(result["cost"])
 
-    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=500, guess=None):
+    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=500, guess=None, parallel=True):
         found_optimal = False
         start = time.time()
         results = []
@@ -511,7 +498,7 @@ class HopfieldNetwork:
         #func = eval("self.{}".format(update_method))
         #func = self.balanced_stochastic_update
         func = self.run_simulation
-        APPLY_ASYNC=True
+        APPLY_ASYNC=False
 
         def check_result(result):
             global found_optimal, total_attempts
@@ -532,23 +519,32 @@ class HopfieldNetwork:
                 results.append(result)
             return out_of_time
 
-        if not APPLY_ASYNC:
-            #temp_results = pool.imap_unordered(func,max_tries*[guess])
-            temp_results = pool.imap_unordered(func, range(0,max_tries))
-            pool.close()
+        if parallel:
+            if not APPLY_ASYNC:
+                #temp_results = pool.imap_unordered(func,max_tries*[guess])
+                temp_results = pool.imap_unordered(func, range(0,max_tries))
+                pool.close()
 
-            # Loop through results as they come in
-            for result in temp_results:
-                # self.plot_current_state()
-                results.append(result)
-                out_of_time = check_result(result)
-                if out_of_time:
-                    break
+                # Loop through results as they come in
+                for result in temp_results:
+                    # self.plot_current_state()
+                    results.append(result)
+                    out_of_time = check_result(result)
+                    if out_of_time:
+                        break
+            else:
+                for i in range(0, max_tries):
+                    pool.apply_async(func=self.run_simulation, args=[guess], callback=check_result)
+                pool.close()
+                pool.join()
         else:
-            for i in range(0, max_tries - 1):
-                pool.apply_async(func=self.run_simulation, args=[guess], callback=check_result)
-            pool.close()
-            pool.join()
+            results = []
+            for i in range(0, max_tries):
+                result = self.run_simulation(guess)
+                results.append(result)
+                b = check_result(result)
+                if b:
+                    break
 
         total_attempts = len(results)
         end = time.time()
