@@ -53,7 +53,7 @@ Other:
 # GLOBALS
 inf = np.inf
 poolcount = multiprocessing.cpu_count()
-poolcount=1
+#poolcount=1
 
 ## Logging
 logger = logging.getLogger(__name__)
@@ -106,6 +106,7 @@ class HopfieldNetwork:
 # add a penalty for update??
 
     def initialize_guess(self, guess=None):
+        np.random.seed(None)
         # Start city doesn't matter, we could always start in 0
         if guess is None:
             guess = np.random.random([self.n, self.n])
@@ -248,10 +249,14 @@ class HopfieldNetwork:
                 #print(improve_tour_factor, inhibition_factor)
 
             # Random order updates
-            temp = -1 / ((e+1) * 1 / epochs)
+            temp = 1 / ((e+1) * 1 / epochs)/2
+
             for pair in all_pairs:
-                #sol_guess =     self.update_node(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
-                sol_guess = self.annealing_update(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor, temperature=temp)
+                if e > epochs*.3:
+                #if True:
+                   sol_guess = self.update_node(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+                else:
+                    sol_guess = self.annealing_update(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor, temperature=temp)
 
             if keep_states:
                 self.states.append(sol_guess.copy())
@@ -367,11 +372,10 @@ class HopfieldNetwork:
         #delta = learning_rate * np.arctan(update)  # we can use a tanh here
 
         #delta = learning_rate * update
-        delta = np.sign(update) * learning_rate
 
         #delta = learning_rate * 1 / 2 * (1 + np.arctan(update - sol_guess[i, j]))  # we can use a tanh here
         #delta = learning_rate * (np.arctan(update - sol_guess[i, j]))  # we can use a tanh here
-        return delta
+        return update
 
     def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
         """ Update a single node
@@ -380,8 +384,8 @@ class HopfieldNetwork:
             learning_rate = self.learning_rate
 
 
-        delta = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
-        #print(delta)
+        update = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+        delta = np.sign(update) * learning_rate
         sol_guess[i, j] = max(min(sol_guess[i, j] + delta, 1), 0)
         return sol_guess
 
@@ -392,28 +396,17 @@ class HopfieldNetwork:
         if learning_rate is None:
             learning_rate = self.learning_rate
         temperature = abs(temperature)
-        temperature = .1
-        #print(i,j)
-        delta = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
-        # sol_guess1 = sol_guess.copy()
-        # sol_guess0 = sol_guess.copy()
-        # sol_guess1[i, j] = 1
-        # sol_guess0[i, j] = 0
-        #
-        # e1 = self.get_happiness(sol_guess1)
-        # e0 = self.get_happiness(sol_guess0)
-
-        # if update is negative, e0 is preferred => higher happiness
-        #p1 = 1/(1+np.exp(-(e0-e1)/temperature))
-        #print(delta)
-        p1 = round(1 / (1 + np.exp(-(delta) / temperature)),4)
-        #print(p1)
+        #temperature = .001
+        update = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+        p1 = round(1 / (1 + np.exp(-(update) / temperature)),4)
         step_direction = np.random.random() <= p1
-        #print(step_direction)
-        #delta = (step_direction*2-1) * learning_rate
-        #print(delta)
+        #
+        # if step_direction != round(p1):
+        #     print("WRONG WAY")
+        #     print(step_direction, round(p1))
+
+        delta = (step_direction*2-1) * learning_rate
         sol_guess[i, j] = max(min(sol_guess[i, j] + delta, 1), 0)
-        #Stop
         return sol_guess
 
     def get_happiness(self, sol, improve_tour_factor=None):
