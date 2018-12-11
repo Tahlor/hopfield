@@ -53,7 +53,7 @@ Other:
 # GLOBALS
 inf = np.inf
 poolcount = multiprocessing.cpu_count()
-
+#poolcount=1
 
 ## Logging
 logger = logging.getLogger(__name__)
@@ -448,7 +448,10 @@ class HopfieldNetwork:
 
     def run_simulation(self, sol_guess=None):
         #print(sol_guess)
+        if isinstance(sol_guess, int):
+            sol_guess=None
         return self.balanced_stochastic_update(sol_guess=sol_guess)
+
 
     def run_simulations(self, simulations=100):
         results = {}
@@ -478,7 +481,6 @@ class HopfieldNetwork:
         print(result["cost"])
 
     def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=500, guess=None):
-        total_attempts = 0
         found_optimal = False
         start = time.time()
         results = []
@@ -487,25 +489,46 @@ class HopfieldNetwork:
         #func = eval("self.{}".format(update_method))
         #func = self.balanced_stochastic_update
         func = self.run_simulation
-        temp_results = pool.imap_unordered(func,max_tries*[guess])
-        pool.close()
+        APPLY_ASYNC=True
 
-        # Loop through results as they come in
-        for result in temp_results:
-            total_attempts+=1
-            #self.plot_current_state()
-            results.append(result)
+        def check_result(result):
+            global found_optimal, total_attempts
+            #print("DONE")
+            out_of_time=False
             if result["cost"] <= self.optimal_cost and self.optimal_cost<inf:
+                print("Found optimal")
                 found_optimal=True
                 if result["cost"] < self.optimal_cost:
                     logger.warn("Provided optimal value was not optimal.")
                 pool.terminate()
-                break
             elif time.time() - start > max_time:
-                print("Out of time")
+                #print("Out of time")
+                #time.sleep(4)
                 pool.terminate()
-                break
-        pool.join()
+                out_of_time=True
+            if APPLY_ASYNC:
+                results.append(result)
+            return out_of_time
+
+        if not APPLY_ASYNC:
+            #temp_results = pool.imap_unordered(func,max_tries*[guess])
+            temp_results = pool.imap_unordered(func, range(0,max_tries))
+            pool.close()
+
+            # Loop through results as they come in
+            for result in temp_results:
+                # self.plot_current_state()
+                results.append(result)
+                out_of_time = check_result(result)
+                if out_of_time:
+                    break
+        else:
+            for i in range(0, max_tries - 1):
+                pool.apply_async(func=self.run_simulation, args=[guess], callback=check_result)
+            pool.close()
+            pool.join()
+
+        total_attempts = len(results)
         end = time.time()
 
         if found_optimal:

@@ -10,12 +10,12 @@ import pandas as pd
 MAX_TIME = 5
 MAX_TIME_FANCY = 20
 AUTO = False
-SIZE = 20
+SIZE = 10
 EASY=0
 NORMAL=1
 HARD=2
 HARDD=3
-DIFFICULTY = HARD
+DIFFICULTY = HARDD
 rand_seed = np.random.randint(0, 1000)
 rand_seed = 10
 
@@ -70,7 +70,10 @@ def test():
     results = solver.greedy(time_allowance=MAX_TIME)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
     greedy_cost = results["cost"]
-    one_hot = utils.one_hot(results["path"])
+    if results["path"] != []:
+        one_hot = utils.one_hot(results["path"])
+    else:
+        one_hot = np.random.random([SIZE,SIZE])
 
     # Random
     results=[]
@@ -89,10 +92,10 @@ def test():
     # Fancy
     cost_matrix = solver.build_matrix()
     network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1,
-                      force_visit_bias=.0, epochs=120, optimal_cost=best_cost, when_to_force_valid=.65,
+                      force_visit_bias=.0, epochs=150, optimal_cost=best_cost, when_to_force_valid=.6,
                       force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1)
     if True:
-        results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=1000, guess=one_hot)
+        results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=1000, guess=None, run_until_optimal=False)
         print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
     else:
         network.make_movie(one_hot)
