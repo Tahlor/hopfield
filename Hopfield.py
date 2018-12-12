@@ -265,7 +265,7 @@ class HopfieldNetwork:
                 #print(improve_tour_factor, inhibition_factor)
 
             # Random order updates
-            temp = 1 / ((e+1) * 1 / epochs)/2
+            temp = 1 / ((e+1) * 1 / epochs)/20
 
             for pair in all_pairs:
                 i = pair[0]
