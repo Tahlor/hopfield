@@ -6,7 +6,6 @@ pages/
 Notes/
 dev/
 *.log
-*.html
 *.txt
 
 # Byte-compiled / optimized / DLL files
