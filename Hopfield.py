@@ -193,6 +193,9 @@ class HopfieldNetwork:
             sol_guess = self.initialize_guess()
         else:
             sol_guess = sol_guess.copy()
+        #initial_cost = self.get_cost(sol_guess)
+        #print(initial_cost)
+        #Stop
         learning_rate = self.learning_rate
         when_to_force_valid = self.when_to_force_valid
         force_valid_factor = self.force_valid_factor
