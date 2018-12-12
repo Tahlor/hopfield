@@ -136,7 +136,7 @@ class HopfieldNetwork:
         cost_matrix = 1 - (temp_cost_matrix - _min) / (_max - _min)  # rescale to 0 to 1, then reverse
 
         # After rescaling, make routes impossible again
-        cost_matrix[inf_idx] = -abs(self.inhibition_factor)*2
+        cost_matrix[inf_idx] = -abs(self.inhibition_factor)*1.1
         return cost_matrix
 
     def fully_stochastic_update(self, iterations=None, sol_guess=None):
