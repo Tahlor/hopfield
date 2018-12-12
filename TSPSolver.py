@@ -44,7 +44,7 @@ class TSPSolver:
         else:
             cities = cityList
         # self._cities = [City(pt.x(), pt.y()) for pt in city_locations]
-        cost_matrix = np.zeros([len(cities),len(cities)])
+        cost_matrix = np.ones([len(cities),len(cities)]) * inf
 
         for i in range(0,len(cities)):
             for j in range(0, len(cities)): # may not be symmetric distances, otherwise use i not 0

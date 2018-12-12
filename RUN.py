@@ -95,7 +95,7 @@ def test():
     #                   force_visit_bias=.0, epochs=150, optimal_cost=best_cost, when_to_force_valid=1.1,
     #                   force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1)
 
-    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1.1,
+    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.1, inhibition_factor=1.1,
                       force_visit_bias=.0, epochs=250, optimal_cost=best_cost, when_to_force_valid=.75,
                       force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1, global_inhibition_factor=1)
     if True:
@@ -103,6 +103,8 @@ def test():
         print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
     else:
         network.make_movie(one_hot)
+    # print(one_hot)
+    # print(cost_matrix)
     del scenario
 
 if __name__=="__main__":

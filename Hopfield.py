@@ -9,6 +9,10 @@ import multiprocessing
 import os
 import matplotlib.pyplot as plt
 
+## Things to check:
+##  inf distances factor
+##  annealing
+##  bidirectional
 """ Todo: 
 
 # Ideas/parameters:
@@ -96,7 +100,7 @@ class HopfieldNetwork:
         self.original_cost_matrix = cost_matrix.copy()
         self.global_inhibition_factor = global_inhibition_factor
 
-        self.cost_matrix = self.scale_cost_matrix(cost_matrix)
+        self.cost_matrix = self.scale_cost_matrix(cost_matrix.copy())
 
         #logger.debug("Guess: \n {}".format(self.sol_guess))
 
@@ -132,7 +136,7 @@ class HopfieldNetwork:
         cost_matrix = 1 - (temp_cost_matrix - _min) / (_max - _min)  # rescale to 0 to 1, then reverse
 
         # After rescaling, make routes impossible again
-        cost_matrix[inf_idx] = -abs(self.inhibition_factor)
+        cost_matrix[inf_idx] = -abs(self.inhibition_factor) * 2
         return cost_matrix
 
     def fully_stochastic_update(self, iterations=None, sol_guess=None):
@@ -189,14 +193,20 @@ class HopfieldNetwork:
             sol_guess = self.initialize_guess()
         else:
             sol_guess = sol_guess.copy()
-
+        learning_rate = self.learning_rate
+        when_to_force_valid = self.when_to_force_valid
+        force_valid_factor = self.force_valid_factor
+        improve_tour_factor = self.improve_tour_factor
+        inhibition_factor = self.inhibition_factor
+        force_visit_bias = self.force_visit_bias
+        global_inhibition_factor = self.global_inhibition_factor
+        n = self.n
+        indices = np.arange(n)
+        cost_matrix = self.cost_matrix.copy()
         lower_bound = 1 if self.clamp_first_column else 0
         i_s = range(0, self.n)
         j_s = range(lower_bound, self.n)
         all_pairs = utils.cartesian_product(i_s, j_s)
-
-        improve_tour_factor = self.improve_tour_factor
-        inhibition_factor = self.inhibition_factor
 
         # Keep track of states
         if keep_states:
@@ -208,7 +218,7 @@ class HopfieldNetwork:
             VERBOSE = False
 
             # Force solution to be valid
-            if e > epochs * self.when_to_force_valid:
+            if e > epochs * when_to_force_valid:
                 if True:
                     if VERBOSE:
                         pass
@@ -219,7 +229,7 @@ class HopfieldNetwork:
                     # too_many_rows.shuffle()
 
                     # Do this once:
-                    if e-1 <= epochs * self.when_to_force_valid:
+                    if e-1 <= epochs * when_to_force_valid:
                         #print("CHECK")
                         col = sol_guess.sum(axis=1)
                         row = sol_guess.sum(axis=0)
@@ -230,20 +240,20 @@ class HopfieldNetwork:
                             sol_guess=self.shock_out_of_invalid(sol_guess)
 
 
-                    too_few_columns, too_many_columns, too_few_rows, too_many_rows = self.local_update_tour_factor(sol_guess)
-
-                    for i in too_few_rows:
-                        for j in too_few_columns:
-                            if VERBOSE:
-                                print("too few", i, j)
-                            self.update_node(i, j, sol_guess=sol_guess, learning_rate=self.learning_rate,
-                                             improve_tour_factor=improve_tour_factor*self.force_valid_factor)
-                    for i in too_many_rows:
-                        for j in too_many_columns:
-                            if VERBOSE:
-                                print("too many", i, j)
-                            self.update_node(i, j, sol_guess=sol_guess, learning_rate=self.learning_rate,
-                                             inhibition_factor=inhibition_factor*self.force_valid_factor)
+                    # too_few_columns, too_many_columns, too_few_rows, too_many_rows = self.local_update_tour_factor(sol_guess)
+                    #
+                    # for i in too_few_rows:
+                    #     for j in too_few_columns:
+                    #         if VERBOSE:
+                    #             print("too few", i, j)
+                    #         self.update_node(i, j, sol_guess=sol_guess, learning_rate=learning_rate,
+                    #                          improve_tour_factor=improve_tour_factor*force_valid_factor)
+                    # for i in too_many_rows:
+                    #     for j in too_many_columns:
+                    #         if VERBOSE:
+                    #             print("too many", i, j)
+                    #         self.update_node(i, j, sol_guess=sol_guess, learning_rate=learning_rate,
+                    #                          inhibition_factor=inhibition_factor*force_valid_factor)
 
                 #improve_tour_factor, inhibition_factor= self.global_update_tour_factor(sol_guess)
                 #print(improve_tour_factor, inhibition_factor)
@@ -252,11 +262,14 @@ class HopfieldNetwork:
             temp = 1 / ((e+1) * 1 / epochs)/2
 
             for pair in all_pairs:
-                if e > epochs*.3:
-                #if True:
-                   sol_guess = self.update_node(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
+                #if e > epochs*.3:
+                i = pair[0]
+                j = pair[1]
+                update = self.calculate_update(i, j, n, sol_guess, cost_matrix, improve_tour_factor, inhibition_factor, global_inhibition_factor, force_visit_bias, indices)
+                if True:
+                   sol_guess = self.update_node(i,j, sol_guess, update, learning_rate)
                 else:
-                    sol_guess = self.annealing_update(pair[0],pair[1], sol_guess=sol_guess, learning_rate=self.learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor, temperature=temp)
+                   sol_guess = self.annealing_update(i,j, sol_guess, update, learning_rate, temperature=temp)
 
             if keep_states:
                 self.states.append(sol_guess.copy())
@@ -330,61 +343,45 @@ class HopfieldNetwork:
         logger.info(result)
         return result
 
-    def calculate_delta(self,i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
-        if improve_tour_factor is None:
-            improve_tour_factor = self.improve_tour_factor
-
-        if inhibition_factor is None:
-            inhibition_factor = self.inhibition_factor
+    def calculate_update(self, i, j, n, sol_guess, cost_matrix, improve_tour_factor, inhibition_factor, global_inhibition_factor, force_visit_bias, indices):
 
         # i is an index of cities
         # j is an index of city-visit ordering
-        next_city_idx = (j + 1) % self.n  # wrap around to beginning
-        previous_city_idx = (j - 1) % self.n
-        indices = np.arange(self.n)
+        next_city_idx = (j + 1) % n  # wrap around to beginning
+        previous_city_idx = (j - 1) % n
 
         # A positive value promotes visits
-        update = self.force_visit_bias * improve_tour_factor * self.n
+        update = force_visit_bias * improve_tour_factor * n
 
         # Cost matrix - this rewards the system for taking a non-zero path to the next city
-        update += np.sum(sol_guess[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor * 2
+        update += np.sum(sol_guess[:, next_city_idx] * cost_matrix[i, :]) * improve_tour_factor
 
         # Rewards system for previous cities
-        # update += np.sum(sol_guess[:, previous_city_idx] * self.cost_matrix[:, i]) * improve_tour_factor
+        update += np.sum(sol_guess[:, previous_city_idx] * cost_matrix[:, i]) * improve_tour_factor
 
         # Global inhibition - neg if too many
-        g = (self.n-np.sum(sol_guess)) * self.global_inhibition_factor # / self.n
+        g = (n-np.sum(sol_guess)) * global_inhibition_factor # / self.n
         update += g
 
         # No duplicate visit on column
-        update += np.sum(sol_guess[indices != i, j] * self.negative_weights) * abs(inhibition_factor)
+        update += np.sum(sol_guess[indices != i, j] * -1) * abs(inhibition_factor)
 
         # No duplicate visit on row
-        update += np.sum(sol_guess[i, indices != j] * self.negative_weights) * abs(inhibition_factor)
+        update += np.sum(sol_guess[i, indices != j] * -1) * abs(inhibition_factor)
 
         return update
 
-    def update_node(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None):
+    def update_node(self, i, j, sol_guess, update, learning_rate):
         """ Update a single node
         """
-        if learning_rate is None:
-            learning_rate = self.learning_rate
-
-
-        update = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
         delta = np.sign(update) * learning_rate
         sol_guess[i, j] = max(min(sol_guess[i, j] + delta, 1), 0)
         return sol_guess
 
-    def annealing_update(self, i, j, sol_guess, learning_rate=None, improve_tour_factor=None, inhibition_factor=None, temperature=1):
+    def annealing_update(self, i, j, sol_guess, update, learning_rate, temperature=1):
         """ Use NEGATIVE temperature with happiness
         """
-
-        if learning_rate is None:
-            learning_rate = self.learning_rate
         temperature = abs(temperature)
-        #temperature = .001
-        update = self.calculate_delta(i, j, sol_guess, learning_rate=learning_rate, improve_tour_factor=improve_tour_factor, inhibition_factor=inhibition_factor)
         p1 = round(1 / (1 + np.exp(-(update) / temperature)),4)
         step_direction = np.random.random() <= p1
         #
