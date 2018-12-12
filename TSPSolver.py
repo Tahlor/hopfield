@@ -377,6 +377,7 @@ class TSPSolver:
         results['max'] = self.max_q           # states stored at once
         results['total'] = self.expansions    # states created
         results['pruned'] = self.prune        # states skipped
+        results['route'] = route
         return results
 
     def fancy( self,time_allowance=60.0, optimal_cost=inf, network=None, simulations = 500, guess = None, run_until_optimal=True):

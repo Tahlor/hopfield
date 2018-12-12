@@ -65,6 +65,7 @@ def test():
     results = solver.branchAndBound(time_allowance=MAX_TIME)
     print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
     best_cost = float(results["cost"].replace("*",""))
+    bb_route = results["route"]
 
     # Greedy
     results = solver.greedy(time_allowance=MAX_TIME)
@@ -74,7 +75,7 @@ def test():
         one_hot = utils.one_hot(results["path"])
     else:
         one_hot = np.random.random([SIZE,SIZE])
-
+    one_hot = utils.one_hot(bb_route)
     # Random
     results=[]
     start = time.time()
@@ -99,7 +100,7 @@ def test():
                       force_visit_bias=.0, epochs=250, optimal_cost=best_cost, when_to_force_valid=.75,
                       force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1, global_inhibition_factor=1)
     if True:
-        results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=100, guess=None, run_until_optimal=True)
+        results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=100, guess=one_hot, run_until_optimal=True)
         print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"], results["pruned"])
     else:
         network.make_movie(one_hot)
