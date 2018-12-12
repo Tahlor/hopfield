@@ -240,21 +240,24 @@ class HopfieldNetwork:
                             sol_guess=self.shock_out_of_invalid(sol_guess)
 
 
-                    # too_few_columns, too_many_columns, too_few_rows, too_many_rows = self.local_update_tour_factor(sol_guess)
-                    #
-                    # for i in too_few_rows:
-                    #     for j in too_few_columns:
-                    #         if VERBOSE:
-                    #             print("too few", i, j)
-                    #         self.update_node(i, j, sol_guess=sol_guess, learning_rate=learning_rate,
-                    #                          improve_tour_factor=improve_tour_factor*force_valid_factor)
-                    # for i in too_many_rows:
-                    #     for j in too_many_columns:
-                    #         if VERBOSE:
-                    #             print("too many", i, j)
-                    #         self.update_node(i, j, sol_guess=sol_guess, learning_rate=learning_rate,
-                    #                          inhibition_factor=inhibition_factor*force_valid_factor)
+                    too_few_columns, too_many_columns, too_few_rows, too_many_rows = self.local_update_tour_factor(sol_guess)
 
+                    for i in too_few_rows:
+                        for j in too_few_columns:
+                            if VERBOSE:
+                                print("too few", i, j)
+                            update = self.calculate_update(i, j, n, sol_guess, cost_matrix, improve_tour_factor*force_valid_factor,
+                                                           inhibition_factor, global_inhibition_factor,
+                                                           force_visit_bias, indices)
+                            self.update_node(i, j, sol_guess, update, learning_rate)
+                    for i in too_many_rows:
+                        for j in too_many_columns:
+                            if VERBOSE:
+                                print("too many", i, j)
+                            update = self.calculate_update(i, j, n, sol_guess, cost_matrix, improve_tour_factor,
+                                                           inhibition_factor*force_valid_factor, global_inhibition_factor,
+                                                           force_visit_bias, indices)
+                            self.update_node(i, j, sol_guess, update, learning_rate)
                 #improve_tour_factor, inhibition_factor= self.global_update_tour_factor(sol_guess)
                 #print(improve_tour_factor, inhibition_factor)
 
@@ -262,11 +265,10 @@ class HopfieldNetwork:
             temp = 1 / ((e+1) * 1 / epochs)/2
 
             for pair in all_pairs:
-                #if e > epochs*.3:
                 i = pair[0]
                 j = pair[1]
                 update = self.calculate_update(i, j, n, sol_guess, cost_matrix, improve_tour_factor, inhibition_factor, global_inhibition_factor, force_visit_bias, indices)
-                if True:
+                if e > epochs*.4:
                    sol_guess = self.update_node(i,j, sol_guess, update, learning_rate)
                 else:
                    sol_guess = self.annealing_update(i,j, sol_guess, update, learning_rate, temperature=temp)
@@ -354,10 +356,10 @@ class HopfieldNetwork:
         update = force_visit_bias * improve_tour_factor * n
 
         # Cost matrix - this rewards the system for taking a non-zero path to the next city
-        update += np.sum(sol_guess[:, next_city_idx] * cost_matrix[i, :]) * improve_tour_factor * 2
+        update += np.sum(sol_guess[:, next_city_idx] * cost_matrix[i, :]) * improve_tour_factor
 
         # Rewards system for previous cities
-        # update += np.sum(sol_guess[:, previous_city_idx] * cost_matrix[:, i]) * improve_tour_factor
+        update += np.sum(sol_guess[:, previous_city_idx] * cost_matrix[:, i]) * improve_tour_factor
 
         # Global inhibition - neg if too many
         g = (n-np.sum(sol_guess)) * global_inhibition_factor # / self.n

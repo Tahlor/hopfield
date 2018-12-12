@@ -112,3 +112,5 @@ if __name__=="__main__":
 
 # Good solutions:
 # 5 348
+
+## GOOD FOR 20: no annealing, single side weights
