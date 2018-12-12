@@ -111,10 +111,15 @@ def test():
     #                   force_visit_bias=.0, epochs=200, optimal_cost=best_cost, when_to_force_valid=.75,
     #                   force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1, global_inhibition_factor=1)
 
-    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1.5,
-                              force_visit_bias=.0, epochs=200, optimal_cost=best_cost, when_to_force_valid=.75,
-                              force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1,
-                              global_inhibition_factor=1)
+    # network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1.07,
+    #                           force_visit_bias=.0, epochs=300, optimal_cost=best_cost, when_to_force_valid=.65,
+    #                           force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1,
+    #                           global_inhibition_factor=1, anneal=False)
+
+    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.1, inhibition_factor=1.07,
+                              force_visit_bias=.0, epochs=500, optimal_cost=best_cost, when_to_force_valid=.65,
+                              force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1,
+                              global_inhibition_factor=1, anneal=True)
 
     if True:
         results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=200, guess=None, run_until_optimal=True)

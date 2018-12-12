@@ -57,7 +57,7 @@ Other:
 # GLOBALS
 inf = np.inf
 poolcount = multiprocessing.cpu_count()
-#poolcount=1
+#poolcount=16
 
 ## Logging
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class HopfieldNetwork:
 
     def __init__(self, cost_matrix, inhibition_factor=1.0, epochs=100, learning_rate=.1, improve_tour_factor=1.0,
                  force_visit_bias=0.0, clamp_first_column=True, optimal_cost=inf, when_to_force_valid=.75, force_valid_factor=1.0,
-                 cost_matrix_exponent=1.0, global_inhibition_factor=1.0):
+                 cost_matrix_exponent=1.0, global_inhibition_factor=1.0, anneal=False):
         """
         Args:
               cost_matrix (2D npy array): Square matrix, expects np.inf for invalid paths
@@ -99,6 +99,7 @@ class HopfieldNetwork:
         self.cost_matrix_exponent = cost_matrix_exponent
         self.original_cost_matrix = cost_matrix.copy()
         self.global_inhibition_factor = global_inhibition_factor
+        self.anneal=False
 
         self.cost_matrix = self.scale_cost_matrix(cost_matrix.copy())
 
@@ -203,6 +204,7 @@ class HopfieldNetwork:
         inhibition_factor = self.inhibition_factor
         force_visit_bias = self.force_visit_bias
         global_inhibition_factor = self.global_inhibition_factor
+        anneal = self.anneal
         n = self.n
         indices = np.arange(n)
         cost_matrix = self.cost_matrix.copy()
@@ -271,8 +273,7 @@ class HopfieldNetwork:
                 i = pair[0]
                 j = pair[1]
                 update = self.calculate_update(i, j, n, sol_guess, cost_matrix, improve_tour_factor, inhibition_factor, global_inhibition_factor, force_visit_bias, indices)
-                #if e > epochs*.3:
-                if True:
+                if e > epochs*.8 or not anneal:
                    sol_guess = self.update_node(i,j, sol_guess, update, learning_rate)
                 else:
                    sol_guess = self.annealing_update(i,j, sol_guess, update, learning_rate, temperature=temp)
