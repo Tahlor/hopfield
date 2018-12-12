@@ -268,7 +268,7 @@ class HopfieldNetwork:
                 i = pair[0]
                 j = pair[1]
                 update = self.calculate_update(i, j, n, sol_guess, cost_matrix, improve_tour_factor, inhibition_factor, global_inhibition_factor, force_visit_bias, indices)
-                if e > epochs*.4:
+                if e > epochs*.3:
                    sol_guess = self.update_node(i,j, sol_guess, update, learning_rate)
                 else:
                    sol_guess = self.annealing_update(i,j, sol_guess, update, learning_rate, temperature=temp)
