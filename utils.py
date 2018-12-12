@@ -43,4 +43,4 @@ def one_hot(labels):
     labels = np.asarray(labels)
     b = np.zeros((labels.size, labels.max() + 1))
     b[np.arange(labels.size), labels] = 1
-    return b
+    return np.transpose(b)

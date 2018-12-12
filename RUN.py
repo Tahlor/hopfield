@@ -76,6 +76,7 @@ def test():
     else:
         one_hot = np.random.random([SIZE,SIZE])
     one_hot = utils.one_hot(bb_route)
+
     # Random
     results=[]
     start = time.time()
