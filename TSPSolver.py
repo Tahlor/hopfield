@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 inf = float('inf')
 
-from which_pyqt import PYQT_VER
-if PYQT_VER == 'PYQT5':
-    from PyQt5.QtCore import QLineF, QPointF
-elif PYQT_VER == 'PYQT4':
-    from PyQt4.QtCore import QLineF, QPointF
-else:
-    raise Exception('Unsupported Version of PyQt: {}'.format(PYQT_VER))
+# from which_pyqt import PYQT_VER
+# if PYQT_VER == 'PYQT5':
+#     from PyQt5.QtCore import QLineF, QPointF
+# elif PYQT_VER == 'PYQT4':
+#     from PyQt4.QtCore import QLineF, QPointF
+# else:
+#     raise Exception('Unsupported Version of PyQt: {}'.format(PYQT_VER))
 
 import time
 import numpy as np
@@ -409,8 +409,8 @@ class TSPSolver:
         return results
 
 
-    def fancyGreedy(self, time_allowance=60.0, optimal_cost=inf):
-        greedyClusters = self.makeGreedyClusters()
+    def fancyGreedy(self, time_allowance=60.0, optimal_cost=inf, network = None, greedy_size=10):
+        greedyClusters = self.makeGreedyClusters(preferredSize=greedy_size)
 
         hopfield_cost_matrix = np.zeros([len(greedyClusters), len(greedyClusters)])
 
@@ -422,10 +422,13 @@ class TSPSolver:
                     cityRight = greedyClusters[j].getEntranceCity()
                     hopfield_cost_matrix[i, j] = cityLeft.costTo(cityRight)
 
-        network = HopfieldNetwork(hopfield_cost_matrix, improve_tour_factor=.85, learning_rate=.1, inhibition_factor=1.07,
-                              force_visit_bias=.0, epochs=500, when_to_force_valid=.65,
-                              force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1,
-                              global_inhibition_factor=1, anneal=True)
+        if network is None:
+            network = HopfieldNetwork(hopfield_cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1.07,
+                                      force_visit_bias=.0, epochs=300, optimal_cost=0, when_to_force_valid=.65,
+                                      force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1,
+                                      global_inhibition_factor=1, anneal=False)
+        else:
+            network.update_cost_matrix(hopfield_cost_matrix)
 
         startTime = time.time()
         '''cost = math.inf
@@ -456,6 +459,9 @@ class TSPSolver:
         return results
 
     def makeGreedyClusters(self, preferredSize = 10):
+        """
+        preferredSize (int): the number of cities to squeeze into one cluster
+        """
         cities = self._scenario.getCities().copy()
         greedyClusters = []
         while(len(cities) > 0):

@@ -1,16 +1,16 @@
 from TSPSolver import *
 from TSPClasses import *
-from Hopfield import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+from Hopfield import *
+#from PyQt5.QtWidgets import *
+#from PyQt5.QtGui import *
 import pandas as pd
 
 # GLobals
 MAX_TIME = 5
 MAX_TIME_FANCY = 25
 AUTO = False
-SIZE = 20
+SIZE = 10
 EASY=0
 NORMAL=1
 HARD=2
@@ -92,16 +92,6 @@ def test():
     best_random_cost = results[["cost"]].dropna(axis=0).min()[0]
     print(SIZE, rand_seed, total_time, avg_cost, best_random_cost, total_iterations)
 
-    # Greedy Fancy
-    results = solver.fancyGreedy(time_allowance=MAX_TIME_FANCY)
-    print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"],
-          results["pruned"])
-    greedy_cost = results["cost"]
-    if results["path"] != []:
-        one_hot = utils.one_hot(results["path"])
-    else:
-        one_hot = np.random.random([SIZE, SIZE])
-
     # Fancy
     cost_matrix = solver.build_matrix()
     # network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1,
@@ -123,7 +113,7 @@ def test():
     #                   force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1, global_inhibition_factor=1)
 
     network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=1.07,
-                              force_visit_bias=.0, epochs=300, optimal_cost=best_cost, when_to_force_valid=.65,
+                              force_visit_bias=.0, epochs=300, optimal_cost=0, when_to_force_valid=.65,
                               force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1,
                               global_inhibition_factor=1, anneal=False)
 
@@ -132,6 +122,15 @@ def test():
     #                           force_visit_bias=.0, epochs=500, optimal_cost=best_cost, when_to_force_valid=.65,
     #                           force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1,
     #                           global_inhibition_factor=1, anneal=True)
+
+
+    # Greedy Fancy
+    results = solver.fancyGreedy(time_allowance=MAX_TIME_FANCY, network=network, greedy_size=2)
+    print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"],
+          results["pruned"])
+
+
+    network.update_cost_matrix(cost_matrix)
 
     if True:
         results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=200, guess=None, run_until_optimal=True)

@@ -1,5 +1,5 @@
 import numpy as np
-import matplotlib
+#import matplotlib
 import time
 import pandas as pd
 import collections
@@ -88,20 +88,18 @@ class HopfieldNetwork:
 
         # globals
         self.inhibition_factor = inhibition_factor
-        self.n = cost_matrix.shape[0]
         self.improve_tour_factor = improve_tour_factor
         self.clamp_first_column = clamp_first_column
-        self.negative_weights = -np.ones(self.n - 1)
         self.force_visit_bias = force_visit_bias
         self.optimal_cost = optimal_cost
         self.when_to_force_valid = when_to_force_valid
         self.force_valid_factor = force_valid_factor
         self.cost_matrix_exponent = cost_matrix_exponent
-        self.original_cost_matrix = cost_matrix.copy()
         self.global_inhibition_factor = global_inhibition_factor
         self.anneal=False
 
-        self.cost_matrix = self.scale_cost_matrix(cost_matrix.copy())
+        self.update_cost_matrix(cost_matrix)
+
 
         #logger.debug("Guess: \n {}".format(self.sol_guess))
 
@@ -109,6 +107,10 @@ class HopfieldNetwork:
         self.epochs = epochs
 
 # add a penalty for update??
+    def update_cost_matrix(self, cost_matrix):
+        self.original_cost_matrix = cost_matrix.copy()
+        self.cost_matrix = self.scale_cost_matrix(cost_matrix.copy())
+        self.n = cost_matrix.shape[0]
 
     def initialize_guess(self, guess=None):
         np.random.seed(None)
@@ -330,7 +332,8 @@ class HopfieldNetwork:
 
     def report_solution(self, solution):
         sol = np.round(solution)
-        happiness = self.get_happiness(sol)
+        #happiness = self.get_happiness(sol)
+        happiness = 0
         path = self.get_path(sol)
         cost = self.get_cost(sol)
         logger.debug(solution)
@@ -422,10 +425,10 @@ class HopfieldNetwork:
                 happiness += sol[i, j] * np.sum(sol[:, next_city_idx] * self.cost_matrix[i, :]) * improve_tour_factor
 
                 # No duplicate visit on column
-                happiness += np.sum(sol[indices != i, j] * self.negative_weights) * sol[i, j]
+                happiness += np.sum(sol[indices != i, j] * -1) * sol[i, j]
 
                 # No duplicate visit on row
-                happiness += np.sum(sol[i, indices != j] * self.negative_weights) * sol[i, j]
+                happiness += np.sum(sol[i, indices != j] * -1) * sol[i, j]
 
         return happiness
 
@@ -495,7 +498,7 @@ class HopfieldNetwork:
         utils.create_movie(data=states, path=r"./movie.mp4", plt_func=self.plot_current_state)
         print(result["cost"])
 
-    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=500, guess=None, parallel=True):
+    def run_until_optimal(self, max_time=60, update_method="balanced_stochastic_update", max_tries=5000, guess=None, parallel=True):
         found_optimal = False
         start = time.time()
         results = []
