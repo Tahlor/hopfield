@@ -357,7 +357,7 @@ class HopfieldNetwork:
         update = force_visit_bias * improve_tour_factor * n
 
         # Cost matrix - this rewards the system for taking a non-zero path to the next city
-        update += np.sum(sol_guess[:, next_city_idx] * cost_matrix[i, :]) * improve_tour_factor
+        update += np.sum(sol_guess[:, next_city_idx] * cost_matrix[i, :]) * improve_tour_factor * 2
 
         # Rewards system for previous cities
         #update += np.sum(sol_guess[:, previous_city_idx] * cost_matrix[:, i]) * improve_tour_factor * 2
