@@ -75,7 +75,7 @@ def test():
         one_hot = utils.one_hot(results["path"])
     else:
         one_hot = np.random.random([SIZE,SIZE])
-    one_hot = utils.one_hot(bb_route)
+    #one_hot = utils.one_hot(bb_route)
 
     # Random
     results=[]
@@ -97,8 +97,8 @@ def test():
     #                   force_visit_bias=.0, epochs=150, optimal_cost=best_cost, when_to_force_valid=1.1,
     #                   force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1)
 
-    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.3, inhibition_factor=2.1,
-                      force_visit_bias=.0, epochs=250, optimal_cost=best_cost, when_to_force_valid=.75,
+    network = HopfieldNetwork(cost_matrix, improve_tour_factor=.85, learning_rate=.01, inhibition_factor=1.1,
+                      force_visit_bias=.0, epochs=200, optimal_cost=best_cost, when_to_force_valid=.75,
                       force_valid_factor=4, clamp_first_column=False, cost_matrix_exponent=1, global_inhibition_factor=1)
     if True:
         results = solver.fancy(time_allowance=MAX_TIME_FANCY, network=network, simulations=100, guess=one_hot, run_until_optimal=True)
