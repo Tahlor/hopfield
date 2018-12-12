@@ -8,7 +8,7 @@ import pandas as pd
 
 # GLobals
 MAX_TIME = 5
-MAX_TIME_FANCY = 10
+MAX_TIME_FANCY = 25
 AUTO = False
 SIZE = 20
 EASY=0
