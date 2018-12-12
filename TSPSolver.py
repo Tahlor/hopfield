@@ -422,29 +422,34 @@ class TSPSolver:
                     cityRight = greedyClusters[j].getEntranceCity()
                     hopfield_cost_matrix[i, j] = cityLeft.costTo(cityRight)
 
-        network = HopfieldNetwork(hopfield_cost_matrix, improve_tour_factor=1.7, learning_rate=.2,
-                                 force_visit_bias=0, epochs=80, when_to_force_valid=.75, force_valid_factor=10,
-                                  optimal_cost=optimal_cost)
+        network = HopfieldNetwork(hopfield_cost_matrix, improve_tour_factor=.85, learning_rate=.1, inhibition_factor=1.07,
+                              force_visit_bias=.0, epochs=500, when_to_force_valid=.65,
+                              force_valid_factor=4, clamp_first_column=True, cost_matrix_exponent=1,
+                              global_inhibition_factor=1, anneal=True)
 
         startTime = time.time()
-        cost = math.inf
+        '''cost = math.inf
         while cost == math.inf and time.time() - startTime < time_allowance:
             best_results = network.balanced_stochastic_update(50)
-            cost = best_results['cost']
+            cost = best_results['cost']'''
 
-        #best_results, avg_results = network.run_until_optimal(max_time=time_allowance,
-                                                              #update_method="balanced_stochastic_update")
+        best_results, avg_results = network.run_until_optimal(max_time=time_allowance,
+                                                              update_method="balanced_stochastic_update")
 
         mySolution = []
         for x in best_results['path']:
             greedyClusterCities = greedyClusters[x].getTourSegment()
             mySolution.extend(greedyClusterCities)
+        route = []
+        for x in mySolution:
+            route.append(x._index)
         soln = TSPSolution(mySolution)
         results = {}
         results['cost'] = soln._costOfRoute()
         results['time'] = time.time()-startTime
         results['count'] = 0
         results['soln'] = soln
+        results['path'] = route
         results['max'] = 0
         results['total'] = 0
         results['pruned'] = 0

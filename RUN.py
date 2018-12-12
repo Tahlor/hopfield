@@ -77,6 +77,7 @@ def test():
         one_hot = np.random.random([SIZE,SIZE])
     #one_hot = utils.one_hot(bb_route)
 
+
     # Random
     results=[]
     start = time.time()
@@ -90,6 +91,16 @@ def test():
     avg_cost = results[["cost"]].dropna(axis=0).mean()[0]
     best_random_cost = results[["cost"]].dropna(axis=0).min()[0]
     print(SIZE, rand_seed, total_time, avg_cost, best_random_cost, total_iterations)
+
+    # Greedy Fancy
+    results = solver.fancyGreedy(time_allowance=MAX_TIME_FANCY)
+    print(SIZE, rand_seed, results["time"], results["cost"], results["max"], results["count"], results["total"],
+          results["pruned"])
+    greedy_cost = results["cost"]
+    if results["path"] != []:
+        one_hot = utils.one_hot(results["path"])
+    else:
+        one_hot = np.random.random([SIZE, SIZE])
 
     # Fancy
     cost_matrix = solver.build_matrix()
@@ -129,6 +140,8 @@ def test():
     # print(one_hot)
     # print(cost_matrix)
     del scenario
+
+
 
 if __name__=="__main__":
     test()
