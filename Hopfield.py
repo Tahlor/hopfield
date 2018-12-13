@@ -211,7 +211,7 @@ class HopfieldNetwork:
         indices = np.arange(n)
         #cost_matrix = self.cost_matrix.copy()
         cost_matrix=self.cost_matrix
-	lower_bound = 1 if self.clamp_first_column else 0
+        lower_bound = 1 if self.clamp_first_column else 0
         i_s = range(0, self.n)
         j_s = range(lower_bound, self.n)
         all_pairs = utils.cartesian_product(i_s, j_s)
