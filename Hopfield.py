@@ -209,8 +209,9 @@ class HopfieldNetwork:
         anneal = self.anneal
         n = self.n
         indices = np.arange(n)
-        cost_matrix = self.cost_matrix.copy()
-        lower_bound = 1 if self.clamp_first_column else 0
+        #cost_matrix = self.cost_matrix.copy()
+        cost_matrix=self.cost_matrix
+	lower_bound = 1 if self.clamp_first_column else 0
         i_s = range(0, self.n)
         j_s = range(lower_bound, self.n)
         all_pairs = utils.cartesian_product(i_s, j_s)
@@ -334,7 +335,8 @@ class HopfieldNetwork:
         sol = np.round(solution)
         #happiness = self.get_happiness(sol)
         happiness = 0
-        path = self.get_path(sol)
+        #path = self.get_path(sol)
+        path = None
         cost = self.get_cost(sol)
         logger.debug(solution)
         logger.debug("solution: {}".format(path))
@@ -352,7 +354,8 @@ class HopfieldNetwork:
              'completion_score': self.completion_score(sol_guess=solution)
                   }
 
-        logger.info(result)
+        logger.info(result)       
+        del sol
         return result
 
     def calculate_update(self, i, j, n, sol_guess, cost_matrix, improve_tour_factor, inhibition_factor, global_inhibition_factor, force_visit_bias, indices):

@@ -79,9 +79,9 @@ def test(SIZE, rand_seed):
     # Random
     results=[]
     start = time.time()
-    #for i in range(0,100):
-    while time.time()-start < MAX_TIME:
-        results.append(solver.defaultRandomTour(time_allowance=MAX_TIME))
+    for i in range(0,100):
+    #while time.time()-start < MAX_TIME:
+        results.append(solver.smartRandomTour(time_allowance=MAX_TIME))
     results = pd.DataFrame(results)
     total_time = results["time"].sum()
     total_iterations = len(results)
@@ -146,11 +146,12 @@ def test(SIZE, rand_seed):
     del scenario
 
 if __name__=="__main__":
-    print("Cities",	"Seed",	"Running Time",	"Cost of best tour found",	"Max # of stored states at a given time	", "# of BSSF updates",	"Total # of states created",	"Total # of states pruned")
-    for repititions in range(0, 5):
-        for size in [60,100,200]:
-            rand_seed = np.random.randint(0, 1000)
-            test(size, rand_seed)
+    #print("Cities",	"Seed",	"Running Time",	"Cost of best tour found",	"Max # of stored states at a given time	", "# of BSSF updates",	"Total # of states created",	"Total # of states pruned")
+    #for repititions in range(0, 5):
+    #for size in [30,60,100,200]:
+    size = 200
+    rand_seed = np.random.randint(0, 1000)
+    test(size, rand_seed)
 
 # Good solutions:
 # 5 348
