@@ -76,11 +76,10 @@ def test(SIZE, rand_seed):
     #one_hot = utils.one_hot(bb_route)
 
 
-    # Random
+    #Random
     results=[]
     start = time.time()
-    #for i in range(0,100):
-    while time.time()-start < MAX_TIME:
+    for i in range(0,1000):
         results.append(solver.defaultRandomTour(time_allowance=MAX_TIME))
     results = pd.DataFrame(results)
     total_time = results["time"].sum()
@@ -88,7 +87,18 @@ def test(SIZE, rand_seed):
     results = results.replace([np.inf, -np.inf], np.nan)
     avg_cost = results[["cost"]].dropna(axis=0).mean()[0]
     best_random_cost = results[["cost"]].dropna(axis=0).min()[0]
-    print("Random", SIZE, rand_seed, total_time, avg_cost, best_random_cost, total_iterations)
+    print("RandomSmart", SIZE, rand_seed, total_time, avg_cost, best_random_cost, total_iterations)
+    del results
+
+    start = time.time()
+    total_iterations=0
+    while time.time()-start < MAX_TIME:
+        r = solver.defaultRandomTour(time_allowance=MAX_TIME)
+        if r["cost"] < np.inf:
+            break
+        total_iterations+=1
+    best_random_cost = r["cost"]
+    print("Random", SIZE, rand_seed, total_time, best_random_cost, total_iterations)
 
     # Fancy
     cost_matrix = solver.build_matrix()
