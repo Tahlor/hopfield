@@ -335,8 +335,8 @@ class HopfieldNetwork:
         sol = np.round(solution)
         #happiness = self.get_happiness(sol)
         happiness = 0
-        #path = self.get_path(sol)
-        path = None
+        path = self.get_path(sol)
+        #path = None
         cost = self.get_cost(sol)
         logger.debug(solution)
         logger.debug("solution: {}".format(path))
